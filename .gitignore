@@ -1,0 +1,15 @@
+node_modules
+dist
+coverage
+*.local
+*.log
+*.tsbuildinfo
+.eslintcache
+.DS_Store
+.idea
+.vscode/*
+!.vscode/extensions.json
+test-results/
+playwright-report/
+contact-sheet/
+dist-test

@@ -1,0 +1,8 @@
+dist
+coverage
+playwright-report
+test-results
+contact-sheet
+package-lock.json
+src/presets/presets.json
+dist-test
