@@ -11,13 +11,15 @@ import { encodePhoto, type EncodedPhoto } from '@/render/encode'
 import { FilmRenderer } from '@/render/FilmRenderer'
 import { newRenderOptions, type RenderOptions } from '@/render/renderOptions'
 import { takePendingPhoto } from '@/photo/pendingPhoto'
-import { photoFileName, sharePhoto } from '@/photo/share'
+import { useSharePhoto } from '@/composables/useSharePhoto'
+import { photoFileName } from '@/photo/share'
 import { loadSourcePhoto, UnreadablePhotoError, type SourcePhoto } from '@/photo/sourcePhoto'
 
 /** Applies presets to one photo from the library, then saves or shares it. */
 const route = useRoute()
 const router = useRouter()
 const alerts = useAlert()
+const sharePhoto = useSharePhoto()
 
 const preset = shallowRef<FilmPreset>(
   presetOrDefault(

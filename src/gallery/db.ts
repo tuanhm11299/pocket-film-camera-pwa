@@ -13,11 +13,32 @@ export interface GalleryPhoto {
   createdAt: number
 }
 
+/**
+ * How a photo is stored. iOS Safari can't reliably use a Blob read back from IndexedDB after a
+ * reload (images and shares fail with "WebKitBlobResource error 1"), so the bytes are stored
+ * and the Blobs rebuilt on read. Photos saved by the first version have `blob` and `thumbnail`.
+ */
+type StoredPhoto = Omit<GalleryPhoto, 'blob' | 'thumbnail'> &
+  (
+    | { bytes: ArrayBuffer; type: string; thumbnailBytes: ArrayBuffer; thumbnailType: string }
+    | { blob: Blob; thumbnail: Blob }
+  )
+
 interface GallerySchema extends DBSchema {
   photos: {
     key: string
-    value: GalleryPhoto
+    value: StoredPhoto
     indexes: { createdAt: number }
+  }
+}
+
+function fromStored(stored: StoredPhoto): GalleryPhoto {
+  if ('blob' in stored) return stored
+  const { bytes, type, thumbnailBytes, thumbnailType, ...photo } = stored
+  return {
+    ...photo,
+    blob: new Blob([bytes], { type }),
+    thumbnail: new Blob([thumbnailBytes], { type: thumbnailType }),
   }
 }
 
@@ -39,7 +60,21 @@ export async function addPhoto(
   photo: Omit<GalleryPhoto, 'id' | 'createdAt'>,
 ): Promise<GalleryPhoto> {
   const entry: GalleryPhoto = { ...photo, id: crypto.randomUUID(), createdAt: Date.now() }
-  await (await db()).put('photos', entry)
+  // Read the bytes before opening the transaction, which would close while waiting.
+  const [bytes, thumbnailBytes] = await Promise.all([
+    photo.blob.arrayBuffer(),
+    photo.thumbnail.arrayBuffer(),
+  ])
+  const { blob, thumbnail, ...rest } = entry
+  await (
+    await db()
+  ).put('photos', {
+    ...rest,
+    bytes,
+    type: blob.type || 'image/jpeg',
+    thumbnailBytes,
+    thumbnailType: thumbnail.type || 'image/jpeg',
+  })
   if (!askedToPersist) {
     askedToPersist = true
     // Ask the browser not to evict the photos when storage runs low.
@@ -51,7 +86,7 @@ export async function addPhoto(
 /** Newest first. */
 export async function listPhotos(): Promise<GalleryPhoto[]> {
   const photos = await (await db()).getAllFromIndex('photos', 'createdAt')
-  return photos.reverse()
+  return photos.reverse().map(fromStored)
 }
 
 export async function latestPhoto(): Promise<GalleryPhoto | undefined> {
@@ -61,11 +96,12 @@ export async function latestPhoto(): Promise<GalleryPhoto | undefined> {
     .transaction('photos')
     .store.index('createdAt')
     .openCursor(null, 'prev')
-  return cursor?.value
+  return cursor ? fromStored(cursor.value) : undefined
 }
 
 export async function getPhoto(id: string): Promise<GalleryPhoto | undefined> {
-  return (await db()).get('photos', id)
+  const stored = await (await db()).get('photos', id)
+  return stored && fromStored(stored)
 }
 
 export async function deletePhoto(id: string): Promise<void> {

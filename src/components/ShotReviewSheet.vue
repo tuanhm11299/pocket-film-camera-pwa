@@ -2,13 +2,15 @@
 import { computed } from 'vue'
 import type { GalleryPhoto } from '@/gallery/db'
 import { useObjectURL } from '@/composables/useObjectURL'
-import { photoFileName, sharePhoto } from '@/photo/share'
+import { useSharePhoto } from '@/composables/useSharePhoto'
+import { photoFileName } from '@/photo/share'
 import AppIcon from './AppIcon.vue'
 
 /** The photo just taken, to look at or share. */
 const props = defineProps<{ photo: GalleryPhoto }>()
 const emit = defineEmits<{ close: [] }>()
 
+const sharePhoto = useSharePhoto()
 const url = useObjectURL(computed(() => props.photo.blob))
 
 function share() {
