@@ -19,6 +19,10 @@ export default defineConfigWithVueTs(
   {
     ...pluginPlaywright.configs['flat/recommended'],
     files: ['tests/e2e/**/*.ts'],
+    rules: {
+      ...pluginPlaywright.configs['flat/recommended'].rules,
+      'playwright/expect-expect': ['warn', { assertFunctionNames: ['expectImageLoaded'] }],
+    },
   },
 
   {

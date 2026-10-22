@@ -1,4 +1,4 @@
-export type ShareResult = 'shared' | 'downloaded' | 'cancelled'
+export type ShareResult = 'shared' | 'downloaded' | 'cancelled' | 'blocked'
 
 export function photoFileName(date = new Date()): string {
   const pad = (n: number) => String(n).padStart(2, '0')
@@ -9,6 +9,9 @@ export function photoFileName(date = new Date()): string {
 /**
  * Opens the share sheet with the photo (on iPhone, "Save Image" puts it in Photos),
  * or downloads it where sharing files isn't supported.
+ *
+ * Returns 'blocked' when the browser refused because the tap that started it was too long ago,
+ * e.g. after rendering a full-resolution photo. Sharing again from a new tap works.
  */
 export async function sharePhoto(blob: Blob, fileName: string): Promise<ShareResult> {
   const file = new File([blob], fileName, { type: blob.type || 'image/jpeg' })
@@ -18,6 +21,7 @@ export async function sharePhoto(blob: Blob, fileName: string): Promise<ShareRes
       return 'shared'
     } catch (error) {
       if ((error as Error).name === 'AbortError') return 'cancelled'
+      if ((error as Error).name === 'NotAllowedError') return 'blocked'
       // Fall through to a download, e.g. when sharing isn't allowed right now.
     }
   }

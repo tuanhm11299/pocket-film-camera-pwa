@@ -40,6 +40,9 @@ function back() {
 
     <p v-if="!isLoading && photos.length === 0" class="empty">
       Photos you take or save show up here. Open one to share it or save it to your photo library.
+      <br /><br />
+      On iPhone, Safari and the Home Screen app keep separate photos, so photos taken in one don't
+      show up in the other.
     </p>
     <ul v-else class="grid">
       <li v-for="{ photo, url } in photos" :key="photo.id">
@@ -52,7 +55,8 @@ function back() {
       </li>
     </ul>
     <p v-if="photos.length > 0" class="note">
-      Photos are stored in this browser. Share them to keep a copy in your photo library.
+      Photos are stored in this browser, and on iPhone, Safari and the Home Screen app keep separate
+      photos. Share them to keep a copy in your photo library.
     </p>
   </main>
 </template>

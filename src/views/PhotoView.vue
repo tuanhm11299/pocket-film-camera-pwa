@@ -5,12 +5,14 @@ import AppIcon from '@/components/AppIcon.vue'
 import { useAlert } from '@/composables/useAlert'
 import { useObjectURL } from '@/composables/useObjectURL'
 import { deletePhoto, getPhoto, type GalleryPhoto } from '@/gallery/db'
-import { downloadPhoto, photoFileName, sharePhoto } from '@/photo/share'
+import { useSharePhoto } from '@/composables/useSharePhoto'
+import { downloadPhoto, photoFileName } from '@/photo/share'
 
 /** One photo from the gallery, to share, download or delete. */
 const props = defineProps<{ id: string }>()
 const router = useRouter()
 const alerts = useAlert()
+const sharePhoto = useSharePhoto()
 
 const photo = shallowRef<GalleryPhoto | null>(null)
 const url = useObjectURL(computed(() => photo.value?.blob))

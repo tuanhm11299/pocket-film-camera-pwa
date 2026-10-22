@@ -1,4 +1,4 @@
-import { expect, test, type Page } from '@playwright/test'
+import { expect, test, type Locator, type Page } from '@playwright/test'
 import { withExif } from '../fixtures/exif'
 
 /** A 200×100 JPEG, red on the left and blue on the right, made by the browser. */
@@ -20,6 +20,13 @@ async function makeJPEG(page: Page): Promise<Uint8Array> {
 async function waitForCamera(page: Page) {
   await page.goto('./')
   await expect(page.getByRole('button', { name: 'Take Photo' })).toBeEnabled()
+}
+
+/** Waits until an <img> has actually decoded, not just been added to the page. */
+async function expectImageLoaded(image: Locator) {
+  await expect
+    .poll(() => image.evaluate((img: HTMLImageElement) => img.complete && img.naturalWidth > 0))
+    .toBe(true)
 }
 
 /** Picks a look on the camera screen and takes a photo with it. */
@@ -54,9 +61,15 @@ test('camera photos are kept in the gallery and the look is remembered', async (
   await waitForCamera(page)
   await takePhoto(page, 'Film', 'Grit 400')
 
+  // After a reload the photo comes from storage, not memory, and must still show.
+  await page.reload()
+  await expectImageLoaded(page.getByRole('button', { name: 'Last Photo' }).locator('img'))
+
   await page.goto('./#/gallery')
   await expect(page.getByRole('link', { name: 'Grit 400 photo' })).toHaveCount(1)
+  await expectImageLoaded(page.getByRole('link', { name: 'Grit 400 photo' }).locator('img'))
   await page.getByRole('link', { name: 'Grit 400 photo' }).click()
+  await expectImageLoaded(page.getByRole('img', { name: 'Photo with the Grit 400 look' }))
 
   const download = page.waitForEvent('download')
   await page.getByRole('button', { name: 'Download' }).click()
@@ -126,4 +139,69 @@ test('the app works offline once loaded', async ({ page, context }) => {
   await page.goto('./#/gallery')
   await expect(page.getByRole('heading', { name: 'Photos' })).toBeVisible()
   await context.setOffline(false)
+})
+
+test('photos saved by the first version still show in the gallery', async ({ page }) => {
+  await waitForCamera(page)
+  // Version 1 stored Blobs directly; write one the same way.
+  await page.evaluate(async () => {
+    const canvas = document.createElement('canvas')
+    canvas.width = 30
+    canvas.height = 40
+    canvas.getContext('2d')!.fillRect(0, 0, 30, 40)
+    const blob = await new Promise<Blob>((resolve) =>
+      canvas.toBlob((b) => resolve(b!), 'image/jpeg'),
+    )
+    await new Promise<void>((resolve, reject) => {
+      const open = indexedDB.open('pocket-film', 1)
+      open.onerror = () => reject(open.error)
+      open.onsuccess = () => {
+        const tx = open.result.transaction('photos', 'readwrite')
+        tx.objectStore('photos').put({
+          id: 'legacy',
+          blob,
+          thumbnail: blob,
+          presetId: 'clean',
+          presetName: 'Clean',
+          width: 30,
+          height: 40,
+          createdAt: Date.now(),
+        })
+        tx.oncomplete = () => resolve()
+        tx.onerror = () => reject(tx.error)
+      }
+    })
+  })
+
+  await page.goto('./#/gallery')
+  await expectImageLoaded(page.getByRole('link', { name: 'Clean photo' }).locator('img'))
+})
+
+test('a share the browser blocks asks for one more tap', async ({ page }) => {
+  // Like Safari after a slow render: the first share is refused, a share from a new tap works.
+  await page.addInitScript(() => {
+    const shared: number[] = []
+    Object.assign(window, { shared })
+    navigator.canShare = () => true
+    navigator.share = async (data?: ShareData) => {
+      shared.push(data?.files?.length ?? 0)
+      if (shared.length === 1) throw new DOMException('Not allowed', 'NotAllowedError')
+    }
+  })
+  await waitForCamera(page)
+  await page.locator('input[type=file]').setInputFiles({
+    name: 'photo.jpg',
+    mimeType: 'image/jpeg',
+    buffer: Buffer.from(await makeJPEG(page)),
+  })
+  await expect(page.getByRole('img', { name: /Photo with the .* look/ })).toBeVisible()
+
+  await page.getByRole('button', { name: 'Share' }).click()
+  const prompt = page.getByRole('alertdialog', { name: 'Photo Ready' })
+  await expect(prompt).toBeVisible()
+  await prompt.getByRole('button', { name: 'Share' }).click()
+  await expect(prompt).toBeHidden()
+  expect(await page.evaluate(() => (window as unknown as { shared: number[] }).shared)).toEqual([
+    1, 1,
+  ])
 })

@@ -92,6 +92,10 @@ to "no change":
   no API for full-resolution stills. Chrome on Android takes full-resolution stills and can
   use the flash.
 - iPhone home-screen apps may ask for camera permission more often than Safari tabs do.
+- On iPhone, Safari and the Home Screen app have separate storage, so photos taken in Safari
+  don't appear after installing the app (and the reverse). Share photos to Photos to keep them.
+  Safari may also clear a site's storage after about a week without visits; the installed app
+  is exempt.
 - HEIC photos open in Safari only.
 
 ## Project layout
