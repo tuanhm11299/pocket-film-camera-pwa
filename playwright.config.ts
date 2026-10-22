@@ -1,5 +1,6 @@
 import process from 'node:process'
 import { defineConfig, devices } from '@playwright/test'
+import { fakeCameraPath } from './tests/e2e/paths'
 
 const port = 4173
 const base = '/pocket-film-camera-pwa/'
@@ -11,6 +12,7 @@ const base = '/pocket-film-camera-pwa/'
  */
 export default defineConfig({
   testDir: './tests/e2e',
+  globalSetup: './tests/e2e/globalSetup.ts',
   timeout: 60_000,
   expect: { timeout: 10_000 },
   forbidOnly: !!process.env.CI,
@@ -31,6 +33,8 @@ export default defineConfig({
           args: [
             '--use-fake-device-for-media-stream',
             '--use-fake-ui-for-media-stream',
+            // A small video file instead of the generated 2560×1920 stream; see tests/e2e/fakeCamera.ts.
+            `--use-file-for-fake-video-capture=${fakeCameraPath}`,
             '--enable-unsafe-swiftshader',
             '--ignore-gpu-blocklist',
           ],

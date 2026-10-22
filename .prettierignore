@@ -6,3 +6,4 @@ contact-sheet
 package-lock.json
 src/presets/presets.json
 dist-test
+.playwright

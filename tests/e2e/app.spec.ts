@@ -22,17 +22,21 @@ async function waitForCamera(page: Page) {
   await expect(page.getByRole('button', { name: 'Take Photo' })).toBeEnabled()
 }
 
-test('the camera takes a photo and keeps it in the gallery', async ({ page }) => {
+/** Picks a look on the camera screen and takes a photo with it. */
+async function takePhoto(page: Page, category: string, look: string) {
+  await page.getByRole('tab', { name: category }).click()
+  await page.getByRole('option', { name: new RegExp(look) }).click()
+  await page.getByRole('button', { name: 'Take Photo' }).click()
+  await expect(page.getByRole('button', { name: 'Last Photo' })).toBeVisible()
+}
+
+test('the camera takes a photo and shows it for review', async ({ page }) => {
   await waitForCamera(page)
   await expect(page.getByRole('option', { name: /Gold 200/ })).toHaveAttribute(
     'aria-selected',
     'true',
   )
-
-  // Pick a disposable look, then shoot.
-  await page.getByRole('tab', { name: 'Disposable' }).click()
-  await page.getByRole('option', { name: /Fun Flash/ }).click()
-  await page.getByRole('button', { name: 'Take Photo' }).click()
+  await takePhoto(page, 'Disposable', 'Fun Flash')
 
   await page.getByRole('button', { name: 'Last Photo' }).click()
   const sheet = page.getByRole('dialog', { name: 'Last photo' })
@@ -44,10 +48,15 @@ test('the camera takes a photo and keeps it in the gallery', async ({ page }) =>
     .getByRole('img')
     .evaluate((img: HTMLImageElement) => ({ w: img.naturalWidth, h: img.naturalHeight }))
   expect(size.w / size.h).toBeCloseTo(3 / 4, 2)
+})
 
-  await sheet.getByRole('link', { name: 'All Photos' }).click()
-  await expect(page.getByRole('link', { name: 'Fun Flash photo' })).toHaveCount(1)
-  await page.getByRole('link', { name: 'Fun Flash photo' }).click()
+test('camera photos are kept in the gallery and the look is remembered', async ({ page }) => {
+  await waitForCamera(page)
+  await takePhoto(page, 'Film', 'Grit 400')
+
+  await page.goto('./#/gallery')
+  await expect(page.getByRole('link', { name: 'Grit 400 photo' })).toHaveCount(1)
+  await page.getByRole('link', { name: 'Grit 400 photo' }).click()
 
   const download = page.waitForEvent('download')
   await page.getByRole('button', { name: 'Download' }).click()
@@ -55,7 +64,7 @@ test('the camera takes a photo and keeps it in the gallery', async ({ page }) =>
 
   // The look is remembered for next time.
   await page.goto('./')
-  await expect(page.getByRole('option', { name: /Fun Flash/ })).toHaveAttribute(
+  await expect(page.getByRole('option', { name: /Grit 400/ })).toHaveAttribute(
     'aria-selected',
     'true',
   )

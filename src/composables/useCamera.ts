@@ -142,6 +142,8 @@ export function useCamera(canvas: Ref<HTMLCanvasElement | null>, preset: Ref<Fil
     navigator.vibrate?.(15)
     const shotPreset = preset.value
     const options = { ...nextOptions, date: new Date() }
+    // The viewfinder pauses while the photo is rendered, so the two don't compete for the GPU.
+    cancelFrame()
 
     let encoded
     try {
@@ -156,6 +158,7 @@ export function useCamera(canvas: Ref<HTMLCanvasElement | null>, preset: Ref<Fil
       return
     } finally {
       isCapturing.value = false
+      if (status.value === 'running') scheduleFrame()
     }
 
     try {
