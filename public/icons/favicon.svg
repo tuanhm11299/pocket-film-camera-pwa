@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <!-- Full-bleed background, so the same art works as a maskable icon. -->
+  <rect width="512" height="512" fill="#111111"/>
+  <g transform="translate(96 150)">
+    <rect width="320" height="212" rx="34" fill="#f2b33d"/>
+    <rect y="58" width="320" height="22" fill="#d9962a"/>
+    <rect x="22" y="22" width="74" height="40" rx="10" fill="#fff8e6"/>
+    <circle cx="200" cy="118" r="76" fill="#1b1b1b"/>
+    <circle cx="200" cy="118" r="50" fill="#33475b"/>
+    <circle cx="183" cy="100" r="14" fill="#8fb3d6" opacity="0.8"/>
+    <rect x="252" y="-18" width="44" height="22" rx="6" fill="#1b1b1b"/>
+  </g>
+</svg>
