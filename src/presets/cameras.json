@@ -1,0 +1,1024 @@
+{
+  "cameras": [
+    {
+      "id": "clean",
+      "name": "Clean",
+      "category": "digital"
+    },
+    {
+      "id": "street-d",
+      "name": "Street D",
+      "inspiredBy": "Ricoh GR digital",
+      "category": "digital",
+      "profiles": [
+        {
+          "id": "default", "name": "Street D",
+          "notes": "Cool tones, deep rich blacks, deep blues and reds, lighter yellows, soft highlight rolloff.",
+          "look": {}
+        }
+      ],
+      "look": {
+        "color": {
+          "contrast": 0.28, "saturation": 1.05, "temperature": -0.12, "highlightRolloff": 0.6,
+          "shadowTint": [-0.01, 0.0, 0.012],
+          "hue": {
+            "red": { "sat": 0.15, "lum": -0.15 },
+            "yellow": { "sat": -0.1, "lum": 0.35 },
+            "green": { "sat": -0.1 },
+            "blue": { "hue": -5, "sat": 0.2, "lum": -0.2 }
+          },
+          "curves": { "master": [[0, 0], [0.1, 0.06], [0.5, 0.5], [1, 1]] }
+        },
+        "grain": { "intensity": 0.1, "size": 0.6, "chroma": 0.7, "response": [1, 0.6, 0.2] },
+        "vignette": 0.15
+      }
+    },
+    {
+      "id": "ccd-2004",
+      "name": "CCD 2004",
+      "inspiredBy": "Early-2000s CCD point-and-shoot",
+      "category": "digital",
+      "options": { "dateStamp": true },
+      "look": {
+        "color": { "exposure": 0.15, "temperature": -0.12, "tint": -0.02 },
+        "grain": { "intensity": 0.14, "size": 0.5, "chroma": 1, "response": [1.3, 0.6, 0.15] },
+        "lens": { "chromaticAberration": 0.45 },
+        "bloom": { "intensity": 0.12, "radius": 0.6, "threshold": 0.8 },
+        "dateStamp": true
+      },
+      "profiles": [
+        {
+          "id": "punchy", "name": "Punchy",
+          "notes": "Harsh contrast and punchy color. Highlights clip easily and bleach to white.",
+          "look": {
+            "color": {
+              "contrast": 0.38, "saturation": 1.25, "clip": 0.85,
+              "hue": { "red": { "sat": 0.1 }, "blue": { "hue": -6, "sat": 0.15 } }
+            }
+          }
+        },
+        {
+          "id": "flat", "name": "Flat",
+          "notes": "Flatter contrast with murky, turquoise shadows.",
+          "look": {
+            "color": {
+              "contrast": 0.05, "saturation": 0.95, "fade": 0.02, "clip": 0.45,
+              "shadowTint": [-0.035, 0.02, 0.015],
+              "curves": { "master": [[0, 0.02], [0.3, 0.25], [1, 1]] }
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": "x-classic",
+      "name": "X Classic",
+      "inspiredBy": "Fujifilm X100",
+      "category": "digital",
+      "look": {
+        "grain": { "intensity": 0.07, "size": 0.6, "chroma": 0.3, "response": [1, 0.7, 0.3] },
+        "vignette": 0.12
+      },
+      "profiles": [
+        {
+          "id": "classic-neg", "name": "Classic Neg", "inspiredBy": "Fujifilm Classic Negative",
+          "notes": "Earthy and bright. Soft, peachy highlights over cool undertones; yellowish skin.",
+          "look": {
+            "color": {
+              "contrast": 0.28, "saturation": 0.9, "temperature": 0.05, "tint": -0.03,
+              "fade": 0.02, "highlightRolloff": 0.5,
+              "shadowTint": [-0.02, 0.01, 0.02], "highlightTint": [0.03, 0.012, -0.015],
+              "hue": {
+                "red": { "sat": -0.05 },
+                "orange": { "hue": 4, "sat": -0.05 },
+                "green": { "hue": -8, "sat": -0.25, "lum": -0.1 },
+                "blue": { "hue": -8, "sat": -0.1 }
+              },
+              "curves": {
+                "red": [[0, 0], [0.5, 0.49], [0.85, 0.88], [1, 1]],
+                "green": [[0, 0.01], [0.5, 0.5], [1, 0.98]]
+              }
+            }
+          }
+        },
+        {
+          "id": "classic-chrome", "name": "Classic Chrome", "inspiredBy": "Fujifilm Classic Chrome",
+          "notes": "Muted, documentary color with firm shadows and calm blues.",
+          "look": {
+            "color": {
+              "exposure": -0.05, "contrast": 0.25, "saturation": 0.75, "tint": -0.02,
+              "highlightRolloff": 0.3,
+              "shadowTint": [-0.01, 0.0, 0.01], "highlightTint": [0.01, 0.01, 0.0],
+              "hue": {
+                "red": { "sat": -0.1 },
+                "yellow": { "sat": -0.2 },
+                "blue": { "sat": -0.1, "lum": -0.15 }
+              },
+              "curves": { "master": [[0, 0], [0.25, 0.2], [0.5, 0.5], [0.75, 0.78], [1, 0.97]] }
+            }
+          }
+        }
+      ]
+    },
+
+    {
+      "id": "slr-35",
+      "name": "SLR 35",
+      "inspiredBy": "35mm SLR",
+      "category": "film135",
+      "options": { "frame": false, "jitter": false },
+      "look": {
+        "aspect": [2, 3],
+        "grain": { "intensity": 0.22, "chroma": 0.35, "roughness": 0.2, "response": [1, 0.9, 0.35] },
+        "halation": { "intensity": 0.15 },
+        "vignette": 0.1,
+        "frame": { "style": "film-35" }
+      },
+      "profiles": [
+        {
+          "id": "gold", "name": "Gold 200", "inspiredBy": "Kodak Gold 200",
+          "notes": "Warm and golden, saturated yellows and oranges, soft highlights.",
+          "look": {
+            "color": {
+              "exposure": 0.1, "saturation": 1.1, "shadowSaturation": 0.85,
+              "temperature": 0.3, "tint": 0.03, "fade": 0.025, "highlightRolloff": 0.5,
+              "filmCurve": { "contrast": 1.15, "toe": 0.6, "shoulder": 0.7, "channelContrast": [1, 1, 0.92] },
+              "shadowTint": [0.01, 0.0, -0.02], "highlightTint": [0.03, 0.02, -0.03],
+              "hue": {
+                "orange": { "sat": 0.1 },
+                "yellow": { "hue": -3, "sat": 0.15, "lum": 0.1 },
+                "green": { "hue": -12, "sat": -0.05 },
+                "blue": { "hue": -5, "sat": -0.05 }
+              }
+            },
+            "frame": { "text": "PF GOLD 200" }
+          }
+        },
+        {
+          "id": "portrait", "name": "Portrait 400", "inspiredBy": "Kodak Portra 400",
+          "notes": "Low contrast and warm-neutral, with smooth skin and pastel greens.",
+          "look": {
+            "color": {
+              "exposure": 0.15, "saturation": 0.9, "highlightSaturation": 0.85,
+              "temperature": 0.12, "tint": 0.03, "fade": 0.035, "highlightRolloff": 0.7,
+              "filmCurve": { "contrast": 0.95, "toe": 0.8, "shoulder": 0.9, "channelContrast": [1, 1, 0.95] },
+              "shadowTint": [-0.005, 0.005, 0.012], "highlightTint": [0.02, 0.01, -0.01],
+              "hue": {
+                "red": { "sat": -0.08 },
+                "orange": { "hue": 2, "sat": -0.08, "lum": 0.08 },
+                "green": { "hue": -10, "sat": -0.2 },
+                "blue": { "hue": -6, "sat": -0.1 }
+              }
+            },
+            "grain": { "intensity": 0.18 },
+            "frame": { "text": "PF PORTRAIT 400" }
+          }
+        },
+        {
+          "id": "vivid", "name": "Vivid 100", "inspiredBy": "Kodak Ektar 100",
+          "notes": "Punchy saturation, deep blues and reds, very fine grain.",
+          "look": {
+            "color": {
+              "saturation": 1.25, "temperature": 0.05, "highlightRolloff": 0.3,
+              "filmCurve": { "contrast": 1.3, "toe": 0.4, "shoulder": 0.5 },
+              "hue": {
+                "red": { "sat": 0.15 },
+                "orange": { "sat": 0.1 },
+                "green": { "sat": 0.05 },
+                "blue": { "hue": -4, "sat": 0.15, "lum": -0.1 }
+              }
+            },
+            "grain": { "intensity": 0.1, "size": 0.8 },
+            "frame": { "text": "PF VIVID 100" }
+          }
+        },
+        {
+          "id": "max", "name": "Max 400", "inspiredBy": "Kodak UltraMax 400",
+          "notes": "Warm, saturated and contrasty, with visible grain.",
+          "look": {
+            "color": {
+              "exposure": 0.05, "saturation": 1.15, "temperature": 0.28, "fade": 0.02,
+              "highlightRolloff": 0.4,
+              "filmCurve": { "contrast": 1.25, "toe": 0.5, "shoulder": 0.6, "channelContrast": [1, 1, 0.95] },
+              "highlightTint": [0.03, 0.01, -0.03],
+              "hue": { "red": { "sat": 0.1 }, "yellow": { "sat": 0.1 } }
+            },
+            "grain": { "intensity": 0.3, "size": 1.1 },
+            "frame": { "text": "PF MAX 400" }
+          }
+        },
+        {
+          "id": "super", "name": "Super 400", "inspiredBy": "Fujifilm Superia 400",
+          "notes": "Cool and a little green, with lively greens and magenta-leaning reds.",
+          "look": {
+            "color": {
+              "saturation": 1.1, "temperature": -0.05, "tint": -0.1, "fade": 0.03,
+              "highlightRolloff": 0.4,
+              "filmCurve": { "contrast": 1.2, "toe": 0.5, "shoulder": 0.6, "channelContrast": [1.02, 1, 0.95] },
+              "shadowTint": [-0.02, 0.015, 0.01],
+              "hue": {
+                "red": { "hue": -3, "sat": 0.05 },
+                "green": { "hue": 8, "sat": 0.1 },
+                "blue": { "hue": -6 }
+              }
+            },
+            "grain": { "intensity": 0.28 },
+            "frame": { "text": "PF SUPER 400" }
+          }
+        },
+        {
+          "id": "pastel", "name": "Pastel 400", "inspiredBy": "Fujifilm Pro 400H",
+          "notes": "Bright and airy: mint greens, cyan skies, low contrast.",
+          "look": {
+            "color": {
+              "exposure": 0.3, "saturation": 0.82, "temperature": -0.05, "tint": -0.06,
+              "fade": 0.07, "highlightRolloff": 0.8,
+              "filmCurve": { "contrast": 0.9, "toe": 0.8, "shoulder": 0.9 },
+              "shadowTint": [-0.01, 0.01, 0.02], "highlightTint": [0.0, 0.01, 0.01],
+              "hue": {
+                "orange": { "sat": -0.1, "lum": 0.05 },
+                "green": { "hue": 15, "sat": -0.1, "lum": 0.1 },
+                "blue": { "hue": -10, "sat": -0.1, "lum": 0.1 }
+              }
+            },
+            "grain": { "intensity": 0.18 },
+            "frame": { "text": "PF PASTEL 400" }
+          }
+        }
+      ]
+    },
+    {
+      "id": "slide-35",
+      "name": "Slide 35",
+      "inspiredBy": "Color slide film",
+      "category": "film135",
+      "options": { "frame": false },
+      "look": {
+        "aspect": [2, 3],
+        "grain": { "intensity": 0.08, "size": 0.7, "chroma": 0.3, "response": [0.8, 1, 0.5] },
+        "vignette": 0.15,
+        "frame": { "style": "slide-mount" }
+      },
+      "profiles": [
+        {
+          "id": "velvia", "name": "Slide 50", "inspiredBy": "Fujifilm Velvia 50",
+          "notes": "Very saturated, deep blacks, rich greens and blues.",
+          "look": {
+            "color": {
+              "exposure": -0.1, "saturation": 1.4, "temperature": 0.05, "tint": 0.05,
+              "highlightRolloff": 0.2,
+              "filmCurve": { "contrast": 1.45, "toe": 0.2, "shoulder": 0.4 },
+              "hue": {
+                "red": { "sat": 0.1 },
+                "green": { "sat": 0.15, "lum": -0.1 },
+                "blue": { "hue": -6, "sat": 0.15, "lum": -0.1 },
+                "magenta": { "sat": 0.1 }
+              }
+            },
+            "frame": { "text": "PF CHROME 50" }
+          }
+        },
+        {
+          "id": "kodachrome", "name": "Chrome 64", "inspiredBy": "Kodak Kodachrome 64",
+          "notes": "Warm, dense reds and yellows, deep blue skies, firm contrast.",
+          "look": {
+            "color": {
+              "saturation": 1.2, "temperature": 0.18, "highlightRolloff": 0.3,
+              "filmCurve": { "contrast": 1.35, "toe": 0.3, "shoulder": 0.5 },
+              "shadowTint": [0.0, -0.005, -0.015],
+              "hue": {
+                "red": { "hue": 3, "sat": 0.15, "lum": -0.1 },
+                "yellow": { "hue": -5, "sat": 0.1 },
+                "green": { "hue": -10, "sat": -0.1, "lum": -0.05 },
+                "blue": { "hue": 4, "sat": 0.05, "lum": -0.15 }
+              }
+            },
+            "grain": { "intensity": 0.12, "size": 0.8 },
+            "frame": { "text": "PF CHROME 64" }
+          }
+        }
+      ]
+    },
+    {
+      "id": "cine-35",
+      "name": "Cine 35",
+      "inspiredBy": "Motion picture film",
+      "category": "film135",
+      "options": { "frame": false, "jitter": false },
+      "look": {
+        "aspect": [2, 3],
+        "grain": { "intensity": 0.25, "chroma": 0.4, "roughness": 0.2, "response": [1, 0.9, 0.3] },
+        "halation": { "intensity": 0.6, "radius": 1.1, "threshold": 0.62 },
+        "vignette": 0.12,
+        "frame": { "style": "film-35" }
+      },
+      "profiles": [
+        {
+          "id": "tungsten", "name": "Tungsten 800", "inspiredBy": "CineStill 800T",
+          "notes": "Cool, tungsten-balanced color with strong red halos around lights.",
+          "look": {
+            "color": {
+              "exposure": 0.1, "saturation": 1.05, "temperature": -0.75, "tint": 0.05,
+              "fade": 0.04, "highlightRolloff": 0.6,
+              "filmCurve": { "contrast": 1.15, "toe": 0.6, "shoulder": 0.7 },
+              "shadowTint": [-0.02, 0.01, 0.03], "highlightTint": [0.02, 0.0, -0.01]
+            },
+            "grain": { "intensity": 0.35, "size": 1.2, "roughness": 0.3 },
+            "halation": { "intensity": 0.85, "radius": 1.2, "threshold": 0.6 },
+            "frame": { "text": "PF 800T" }
+          }
+        },
+        {
+          "id": "daylight", "name": "Daylight 250", "inspiredBy": "Daylight cine negative",
+          "notes": "Vibrant but bleached, cool greens and purple-leaning shadows. A little dark.",
+          "look": {
+            "color": {
+              "exposure": -0.15, "temperature": 0.05, "highlightSaturation": 0.8,
+              "filmCurve": { "contrast": 1.25, "toe": 0.5, "shoulder": 0.8, "channelContrast": [1.02, 1, 0.95] },
+              "shadowTint": [0.008, -0.01, 0.02],
+              "hue": {
+                "orange": { "sat": 0.05 },
+                "green": { "hue": 12, "sat": -0.15 },
+                "blue": { "hue": -5, "sat": 0.05 }
+              }
+            },
+            "halation": { "intensity": 0.5 },
+            "frame": { "text": "PF 250D" }
+          }
+        },
+        {
+          "id": "print", "name": "Print Warm", "inspiredBy": "Cine print film",
+          "notes": "Warm, saturated print tones over cool shadows.",
+          "look": {
+            "color": {
+              "exposure": -0.1, "saturation": 1.15, "temperature": 0.25, "tint": 0.02,
+              "filmCurve": { "contrast": 1.35, "toe": 0.4, "shoulder": 0.6 },
+              "shadowTint": [-0.01, 0.0, 0.02], "highlightTint": [0.03, 0.015, -0.02],
+              "hue": {
+                "red": { "sat": 0.1, "lum": -0.05 },
+                "orange": { "sat": 0.1 },
+                "aqua": { "hue": 10, "sat": -0.1 },
+                "blue": { "hue": -8 }
+              }
+            },
+            "halation": { "intensity": 0.5 },
+            "frame": { "text": "PF 500T" }
+          }
+        }
+      ]
+    },
+    {
+      "id": "mono-35",
+      "name": "Mono 35",
+      "inspiredBy": "Black and white film",
+      "category": "film135",
+      "options": { "frame": false, "jitter": false },
+      "look": {
+        "aspect": [2, 3],
+        "frame": { "style": "film-35" }
+      },
+      "profiles": [
+        {
+          "id": "hp5", "name": "Mono 400", "inspiredBy": "Ilford HP5 Plus 400",
+          "notes": "Classic, forgiving black and white with moderate contrast.",
+          "look": {
+            "color": {
+              "monochrome": true, "monoMix": [0.3, 0.59, 0.11], "fade": 0.03, "highlightRolloff": 0.5,
+              "filmCurve": { "contrast": 1.15, "toe": 0.6, "shoulder": 0.7 }
+            },
+            "grain": { "intensity": 0.4, "size": 1.1, "roughness": 0.3, "response": [0.9, 1, 0.5] },
+            "vignette": 0.1,
+            "frame": { "text": "PF HP 400" }
+          }
+        },
+        {
+          "id": "trix", "name": "Grit 400", "inspiredBy": "Kodak Tri-X 400",
+          "notes": "Gritty, contrasty black and white with coarse grain.",
+          "look": {
+            "color": {
+              "monochrome": true, "monoMix": [0.25, 0.65, 0.1], "exposure": 0.05, "highlightRolloff": 0.3,
+              "filmCurve": { "contrast": 1.45, "toe": 0.35, "shoulder": 0.5 }
+            },
+            "grain": { "intensity": 0.5, "size": 1.3, "roughness": 0.5, "response": [0.9, 1, 0.5] },
+            "vignette": 0.2,
+            "frame": { "text": "PF TX 400" }
+          }
+        }
+      ]
+    },
+    {
+      "id": "range-35",
+      "name": "Range 35",
+      "inspiredBy": "Classic rangefinder",
+      "category": "film135",
+      "options": { "lightLeak": false },
+      "profiles": [
+        {
+          "id": "default", "name": "Range 35",
+          "notes": "Desaturated with greenish undertones and a soft highlight rolloff.",
+          "look": {}
+        }
+      ],
+      "look": {
+        "aspect": [2, 3],
+        "color": {
+          "saturation": 0.8, "temperature": 0.02, "tint": -0.08, "highlightRolloff": 0.7,
+          "filmCurve": { "contrast": 1.1, "toe": 0.6, "shoulder": 0.85 },
+          "shadowTint": [-0.01, 0.015, 0.0],
+          "hue": {
+            "orange": { "sat": -0.05 },
+            "green": { "hue": -6, "sat": -0.15 },
+            "blue": { "sat": -0.2 }
+          }
+        },
+        "grain": { "intensity": 0.22, "chroma": 0.3, "roughness": 0.2, "response": [1, 0.9, 0.35] },
+        "vignette": 0.18,
+        "lightLeak": { "intensity": 0.45 }
+      }
+    },
+    {
+      "id": "pocket-t2",
+      "name": "Pocket T2",
+      "inspiredBy": "Contax T2",
+      "category": "film135",
+      "options": { "lightLeak": false },
+      "profiles": [
+        {
+          "id": "default", "name": "Pocket T2",
+          "notes": "Washed out, with pink-leaning highlights.",
+          "look": {}
+        }
+      ],
+      "look": {
+        "aspect": [2, 3],
+        "color": {
+          "exposure": 0.15, "saturation": 0.88, "tint": 0.04, "fade": 0.05, "highlightRolloff": 0.6,
+          "filmCurve": { "contrast": 1.0, "toe": 0.8, "shoulder": 0.9 },
+          "highlightTint": [0.025, 0.0, 0.012],
+          "hue": { "orange": { "lum": 0.05 }, "green": { "hue": -5, "sat": -0.15 } }
+        },
+        "grain": { "intensity": 0.2, "chroma": 0.35, "roughness": 0.2, "response": [1, 0.9, 0.35] },
+        "vignette": 0.08,
+        "lightLeak": { "intensity": 0.4, "color": [1.0, 0.4, 0.35], "edgeColor": [1.0, 0.7, 0.6] }
+      }
+    },
+    {
+      "id": "zoom-85",
+      "name": "Zoom 85",
+      "inspiredBy": "Canon Sure Shot zoom",
+      "category": "film135",
+      "options": { "dateStamp": true },
+      "profiles": [
+        {
+          "id": "default", "name": "Zoom 85",
+          "notes": "Hazy, noisy and almost out of focus, with lifted, cold shadows.",
+          "look": {}
+        }
+      ],
+      "look": {
+        "aspect": [2, 3],
+        "color": {
+          "exposure": 0.1, "saturation": 0.92, "temperature": 0.05, "fade": 0.07, "highlightRolloff": 0.5,
+          "filmCurve": { "contrast": 1.0, "toe": 0.9, "shoulder": 0.8 },
+          "shadowTint": [-0.02, 0.0, 0.035]
+        },
+        "grain": { "intensity": 0.38, "size": 1.2, "chroma": 0.6, "roughness": 0.3, "response": [1.2, 1, 0.4] },
+        "bloom": { "intensity": 0.3, "radius": 1.2, "threshold": 0.5 },
+        "softness": 0.35,
+        "lens": { "edgeBlur": 0.5, "blur": 0.25 },
+        "vignette": 0.15,
+        "dateStamp": true
+      }
+    },
+    {
+      "id": "sprocket",
+      "name": "Sprocket",
+      "inspiredBy": "Lomography Sprocket Rocket",
+      "category": "film135",
+      "options": { "frame": true, "jitter": true },
+      "profiles": [
+        {
+          "id": "default", "name": "Sprocket",
+          "notes": "Panoramic and grungy: high contrast, cyan blues, yellowish skin, bulging lens and heavy vignette.",
+          "look": {}
+        }
+      ],
+      "look": {
+        "aspect": [9, 4],
+        "color": {
+          "saturation": 1.1, "temperature": 0.08, "fade": 0.03,
+          "filmCurve": { "contrast": 1.45, "toe": 0.35, "shoulder": 0.5, "channelContrast": [1.05, 1, 0.9] },
+          "shadowTint": [-0.01, 0.01, 0.01],
+          "hue": {
+            "orange": { "hue": 5, "sat": 0.05 },
+            "aqua": { "sat": 0.1 },
+            "blue": { "hue": -15, "sat": 0.1 }
+          }
+        },
+        "grain": { "intensity": 0.35, "size": 1.2, "chroma": 0.4, "roughness": 0.4, "response": [1, 0.9, 0.4] },
+        "lens": { "distortion": 0.5, "edgeBlur": 0.3 },
+        "vignette": 0.55,
+        "frame": { "style": "film-35", "text": "PF 400" }
+      }
+    },
+    {
+      "id": "expired-u",
+      "name": "Expired U",
+      "inspiredBy": "Expired film in a 35mm SLR",
+      "category": "film135",
+      "options": { "lightLeak": false },
+      "profiles": [
+        {
+          "id": "default", "name": "Expired U",
+          "notes": "Nostalgic, expired look: green-leaning, orange reds, strong coarse grain.",
+          "look": {}
+        }
+      ],
+      "look": {
+        "aspect": [2, 3],
+        "color": {
+          "exposure": 0.1, "saturation": 0.85, "tint": -0.15, "fade": 0.06,
+          "filmCurve": { "contrast": 1.05, "toe": 0.8, "shoulder": 0.7, "channelContrast": [1, 0.95, 1.08] },
+          "shadowTint": [-0.01, 0.03, 0.0], "highlightTint": [0.02, 0.02, -0.03],
+          "hue": { "red": { "hue": 12, "sat": 0.05 }, "blue": { "hue": -10, "sat": -0.3 } }
+        },
+        "grain": { "intensity": 0.55, "size": 1.4, "chroma": 0.5, "roughness": 0.7, "response": [1, 1, 0.6] },
+        "vignette": 0.25,
+        "lightLeak": { "intensity": 0.4 }
+      }
+    },
+    {
+      "id": "infrared",
+      "name": "Infrared",
+      "inspiredBy": "Infrared color film",
+      "category": "film135",
+      "look": {
+        "aspect": [2, 3],
+        "grain": { "intensity": 0.3, "size": 1.1, "chroma": 0.3, "response": [1, 0.9, 0.4] },
+        "halation": { "intensity": 0.4 },
+        "vignette": 0.15
+      },
+      "profiles": [
+        {
+          "id": "ir400", "name": "IR 400",
+          "notes": "Teals, oranges, reds and pinks: yellows and light greens turn pink, foliage red, blues cyan.",
+          "look": {
+            "color": {
+              "saturation": 1.1,
+              "filmCurve": { "contrast": 1.15, "toe": 0.6, "shoulder": 0.6 },
+              "hue": {
+                "orange": { "hue": -5 },
+                "yellow": { "hue": -80, "sat": 0.2, "lum": 0.1 },
+                "green": { "hue": -110, "sat": 0.3, "lum": 0.3 },
+                "aqua": { "hue": -10 },
+                "blue": { "hue": -40, "sat": 0.1 }
+              }
+            }
+          }
+        },
+        {
+          "id": "ir100", "name": "IR 100",
+          "notes": "Faded browns, oranges and blues: yellows and greens turn brown or orange, pinks and purples dark blue.",
+          "look": {
+            "color": {
+              "saturation": 0.9, "fade": 0.05,
+              "filmCurve": { "contrast": 1.1, "toe": 0.7, "shoulder": 0.7 },
+              "hue": {
+                "yellow": { "hue": -25, "sat": -0.2 },
+                "green": { "hue": -80, "sat": -0.3, "lum": -0.1 },
+                "purple": { "hue": -30, "lum": -0.2 },
+                "magenta": { "hue": -70, "lum": -0.3 }
+              }
+            }
+          }
+        }
+      ]
+    },
+
+    {
+      "id": "tlr-66",
+      "name": "TLR 66",
+      "inspiredBy": "Twin-lens reflex (Rolleiflex)",
+      "category": "film120",
+      "options": { "frame": false },
+      "look": {
+        "aspect": [1, 1],
+        "grain": { "intensity": 0.14, "size": 0.7, "chroma": 0.3, "response": [1, 0.9, 0.35] },
+        "vignette": 0.18,
+        "frame": { "style": "film-120", "text": "PF 120" }
+      },
+      "profiles": [
+        {
+          "id": "warm", "name": "Warm 100",
+          "notes": "Oversaturated and warm, with pinkish tones.",
+          "look": {
+            "color": {
+              "saturation": 1.3, "temperature": 0.22, "tint": 0.06,
+              "filmCurve": { "contrast": 1.2, "toe": 0.6, "shoulder": 0.7 },
+              "highlightTint": [0.02, 0.0, 0.0],
+              "hue": { "red": { "hue": -4, "sat": 0.1 }, "orange": { "hue": -3, "sat": 0.05 } }
+            }
+          }
+        },
+        {
+          "id": "cold", "name": "Cold 200",
+          "notes": "Oversaturated and cold, with plasticky color.",
+          "look": {
+            "color": {
+              "saturation": 1.3, "temperature": -0.25, "tint": -0.03, "clip": 0.2,
+              "filmCurve": { "contrast": 1.25, "toe": 0.5, "shoulder": 0.5 },
+              "hue": {
+                "green": { "hue": 10, "sat": 0.1 },
+                "aqua": { "sat": 0.2 },
+                "blue": { "sat": 0.2 }
+              }
+            }
+          }
+        },
+        {
+          "id": "bw", "name": "B&W",
+          "notes": "Soft, low-contrast black and white.",
+          "look": {
+            "color": {
+              "monochrome": true, "monoMix": [0.3, 0.6, 0.1], "fade": 0.04,
+              "filmCurve": { "contrast": 0.9, "toe": 0.9, "shoulder": 0.9 }
+            },
+            "grain": { "intensity": 0.2, "roughness": 0.3, "response": [0.9, 1, 0.5] }
+          }
+        }
+      ]
+    },
+    {
+      "id": "holga",
+      "name": "Holga",
+      "inspiredBy": "Holga 120",
+      "category": "film120",
+      "options": { "frame": false, "lightLeak": false },
+      "profiles": [
+        {
+          "id": "default", "name": "Holga",
+          "notes": "Teal and orange with orange reds, pinched lens, blurry edges, heavy vignette.",
+          "look": {}
+        }
+      ],
+      "look": {
+        "aspect": [1, 1],
+        "color": {
+          "saturation": 1.15, "temperature": 0.08,
+          "filmCurve": { "contrast": 1.3, "toe": 0.5, "shoulder": 0.6, "channelContrast": [1.05, 1, 0.92] },
+          "shadowTint": [-0.025, 0.01, 0.02], "highlightTint": [0.03, 0.01, -0.03],
+          "hue": { "red": { "hue": 10, "sat": 0.1 }, "aqua": { "sat": 0.15 }, "blue": { "hue": -12 } }
+        },
+        "grain": { "intensity": 0.25, "size": 0.9, "chroma": 0.3, "roughness": 0.3, "response": [1, 0.9, 0.4] },
+        "softness": 0.15,
+        "lens": { "distortion": -0.6, "edgeBlur": 0.85, "chromaticAberration": 0.3 },
+        "vignette": 0.75,
+        "lightLeak": { "intensity": 0.5 },
+        "frame": { "style": "film-120", "text": "PF 120" }
+      }
+    },
+    {
+      "id": "pro-67",
+      "name": "Pro 67",
+      "inspiredBy": "Pentax 6×7",
+      "category": "film120",
+      "options": { "frame": false },
+      "look": {
+        "aspect": [6, 7],
+        "grain": { "intensity": 0.12, "size": 0.7, "chroma": 0.3, "response": [1, 0.9, 0.35] },
+        "vignette": 0.1,
+        "frame": { "style": "film-120", "text": "PF 120" }
+      },
+      "profiles": [
+        {
+          "id": "cool", "name": "Cool 100",
+          "notes": "Cool overtones with pinkish skin.",
+          "look": {
+            "color": {
+              "saturation": 1.05, "temperature": -0.12, "tint": 0.04,
+              "filmCurve": { "contrast": 1.15, "toe": 0.6, "shoulder": 0.8 },
+              "hue": { "orange": { "hue": -5, "sat": -0.05, "lum": 0.05 }, "blue": { "sat": 0.05 } }
+            }
+          }
+        },
+        {
+          "id": "warm", "name": "Warm 100",
+          "notes": "Warm overtones with pinkish skin.",
+          "look": {
+            "color": {
+              "saturation": 1.1, "temperature": 0.2, "tint": 0.05,
+              "filmCurve": { "contrast": 1.15, "toe": 0.6, "shoulder": 0.8 },
+              "hue": { "orange": { "hue": -4 } }
+            }
+          }
+        },
+        {
+          "id": "bw", "name": "Mono 400",
+          "notes": "Standard black and white.",
+          "look": {
+            "color": {
+              "monochrome": true, "monoMix": [0.25, 0.65, 0.1],
+              "filmCurve": { "contrast": 1.2, "toe": 0.6, "shoulder": 0.7 }
+            },
+            "grain": { "intensity": 0.25, "roughness": 0.3, "response": [0.9, 1, 0.5] }
+          }
+        }
+      ]
+    },
+
+    {
+      "id": "mini-instant",
+      "name": "Mini Instant",
+      "inspiredBy": "Fujifilm Instax Mini",
+      "category": "instant",
+      "options": { "frame": true },
+      "frameColors": [
+        { "name": "White", "color": "#f4f2ec" },
+        { "name": "Black", "color": "#1c1c1c" },
+        { "name": "Pink", "color": "#f2c4cd" },
+        { "name": "Mint", "color": "#bfe4d4" },
+        { "name": "Sky", "color": "#bdd5ef" },
+        { "name": "Lemon", "color": "#f3e3a0" }
+      ],
+      "profiles": [
+        {
+          "id": "default", "name": "Mini Instant",
+          "notes": "Bleached, nostalgic instant color, slightly soft.",
+          "look": {}
+        }
+      ],
+      "look": {
+        "aspect": [3, 4],
+        "color": {
+          "exposure": 0.2, "saturation": 0.85, "highlightSaturation": 0.6,
+          "temperature": 0.05, "tint": -0.03, "fade": 0.05, "clip": 0.3,
+          "filmCurve": { "contrast": 1.1, "toe": 0.7, "shoulder": 0.4 },
+          "shadowTint": [-0.01, 0.01, 0.025], "highlightTint": [0.02, 0.02, 0.0],
+          "hue": { "green": { "hue": 8, "sat": -0.1 }, "blue": { "hue": -8, "lum": 0.1 } }
+        },
+        "grain": { "intensity": 0.12, "size": 0.8, "chroma": 0.3, "response": [1, 0.9, 0.35] },
+        "softness": 0.2,
+        "lens": { "edgeBlur": 0.2, "blur": 0.35 },
+        "vignette": 0.12,
+        "frame": { "style": "instax-mini" }
+      }
+    },
+    {
+      "id": "square-instant",
+      "name": "Square Instant",
+      "inspiredBy": "Fujifilm Instax Square",
+      "category": "instant",
+      "options": { "frame": true, "lightLeak": false },
+      "frameColors": [
+        { "name": "White", "color": "#f4f2ec" },
+        { "name": "Black", "color": "#1c1c1c" },
+        { "name": "Pink", "color": "#f2c4cd" },
+        { "name": "Mint", "color": "#bfe4d4" },
+        { "name": "Sky", "color": "#bdd5ef" },
+        { "name": "Lemon", "color": "#f3e3a0" }
+      ],
+      "look": {
+        "aspect": [1, 1],
+        "grain": { "intensity": 0.12, "size": 0.8, "chroma": 0.3, "response": [1, 0.9, 0.35] },
+        "softness": 0.2,
+        "lens": { "edgeBlur": 0.2, "blur": 0.35 },
+        "vignette": 0.12,
+        "lightLeak": { "intensity": 0.45 },
+        "frame": { "style": "instax-square" }
+      },
+      "profiles": [
+        {
+          "id": "color", "name": "Color",
+          "notes": "Bleached, nostalgic instant color, slightly soft.",
+          "look": {
+            "color": {
+              "exposure": 0.2, "saturation": 0.85, "highlightSaturation": 0.6,
+              "temperature": 0.05, "tint": -0.03, "fade": 0.05, "clip": 0.3,
+              "filmCurve": { "contrast": 1.1, "toe": 0.7, "shoulder": 0.4 },
+              "shadowTint": [-0.01, 0.01, 0.025], "highlightTint": [0.02, 0.02, 0.0],
+              "hue": { "green": { "hue": 8, "sat": -0.1 }, "blue": { "hue": -8, "lum": 0.1 } }
+            }
+          }
+        },
+        {
+          "id": "bw", "name": "B&W",
+          "notes": "Black and white with clipped highlights.",
+          "look": {
+            "color": {
+              "monochrome": true, "monoMix": [0.3, 0.59, 0.11], "exposure": 0.15, "clip": 0.6,
+              "filmCurve": { "contrast": 1.3, "toe": 0.5, "shoulder": 0.1 }
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": "folding-instant",
+      "name": "Folding Instant",
+      "inspiredBy": "Polaroid folding camera",
+      "category": "instant",
+      "options": { "frame": true },
+      "look": {
+        "aspect": [3, 4],
+        "grain": { "intensity": 0.2, "chroma": 0.3, "response": [1, 0.9, 0.4] },
+        "softness": 0.1,
+        "lens": { "edgeBlur": 0.3 },
+        "vignette": 0.25,
+        "frame": { "style": "instant-white" }
+      },
+      "profiles": [
+        {
+          "id": "cold", "name": "Cold 100",
+          "notes": "Cold, dark, desaturated and moody, with crushed shadows. Use the flash.",
+          "look": {
+            "color": {
+              "exposure": -0.35, "saturation": 0.7, "temperature": -0.25,
+              "filmCurve": { "contrast": 1.3, "toe": 0.2, "shoulder": 0.7 },
+              "shadowTint": [-0.01, 0.0, 0.02],
+              "curves": { "master": [[0, 0], [0.12, 0.03], [1, 1]] }
+            }
+          }
+        },
+        {
+          "id": "bw", "name": "B&W 3000",
+          "notes": "Black and white with lifted blacks and strong, coarse grain.",
+          "look": {
+            "color": {
+              "monochrome": true, "monoMix": [0.3, 0.59, 0.11], "exposure": -0.2, "fade": 0.12,
+              "filmCurve": { "contrast": 1.2, "toe": 0.6, "shoulder": 0.6 }
+            },
+            "grain": { "intensity": 0.55, "size": 1.4, "roughness": 0.8, "response": [1, 1, 0.6] }
+          }
+        }
+      ]
+    },
+
+    {
+      "id": "fun-flash",
+      "name": "Fun Flash",
+      "inspiredBy": "Kodak FunSaver",
+      "category": "disposable",
+      "options": { "lightLeak": true, "dateStamp": true },
+      "profiles": [
+        {
+          "id": "default", "name": "Fun Flash",
+          "notes": "Saturated and punchy, warm, pinched lens and strong vignette.",
+          "look": {}
+        }
+      ],
+      "look": {
+        "aspect": [2, 3],
+        "color": {
+          "exposure": 0.1, "saturation": 1.2, "temperature": 0.32, "fade": 0.04, "highlightRolloff": 0.5,
+          "filmCurve": { "contrast": 1.25, "toe": 0.5, "shoulder": 0.6 },
+          "highlightTint": [0.03, 0.01, -0.03],
+          "hue": { "red": { "sat": 0.1 }, "yellow": { "sat": 0.1 } }
+        },
+        "grain": { "intensity": 0.35, "size": 1.4, "chroma": 0.4, "roughness": 0.3, "response": [1, 0.9, 0.4] },
+        "softness": 0.3,
+        "lens": { "distortion": -0.35, "edgeBlur": 0.4 },
+        "flash": 0.5,
+        "vignette": 0.35,
+        "lightLeak": { "intensity": 0.35, "chance": 0.6 },
+        "variation": { "exposure": 0.3, "temperature": 0.15 },
+        "dateStamp": true
+      }
+    },
+    {
+      "id": "snap-27",
+      "name": "Snap 27",
+      "inspiredBy": "Fujifilm QuickSnap",
+      "category": "disposable",
+      "options": { "lightLeak": false, "dateStamp": true },
+      "profiles": [
+        {
+          "id": "default", "name": "Snap 27",
+          "notes": "Nostalgic daylight disposable: sometimes overexposed, soft green undertones, yellowish skin.",
+          "look": {}
+        }
+      ],
+      "look": {
+        "aspect": [2, 3],
+        "color": {
+          "exposure": 0.1, "saturation": 1.1, "temperature": 0.05, "tint": -0.12, "fade": 0.04,
+          "highlightRolloff": 0.5,
+          "filmCurve": { "contrast": 1.2, "toe": 0.6, "shoulder": 0.5 },
+          "shadowTint": [-0.02, 0.02, 0.0],
+          "hue": { "orange": { "hue": 6 }, "green": { "sat": 0.1 } }
+        },
+        "grain": { "intensity": 0.32, "size": 1.3, "chroma": 0.4, "roughness": 0.3, "response": [1, 0.9, 0.4] },
+        "softness": 0.25,
+        "lens": { "distortion": -0.25, "edgeBlur": 0.35 },
+        "flash": 0.45,
+        "vignette": 0.3,
+        "lightLeak": { "intensity": 0.35 },
+        "variation": { "exposure": 0.4, "temperature": 0.1 },
+        "dateStamp": true
+      }
+    },
+    {
+      "id": "simple-400",
+      "name": "Simple 400",
+      "inspiredBy": "Fujifilm Simple Ace",
+      "category": "disposable",
+      "options": { "dateStamp": true },
+      "profiles": [
+        {
+          "id": "default", "name": "Simple 400",
+          "notes": "Warm, with pinkish whites, muddy yellows, cyan blues and cool greens.",
+          "look": {}
+        }
+      ],
+      "look": {
+        "aspect": [2, 3],
+        "color": {
+          "saturation": 1.05, "temperature": 0.25, "fade": 0.03, "highlightRolloff": 0.5,
+          "filmCurve": { "contrast": 1.2, "toe": 0.6, "shoulder": 0.6 },
+          "highlightTint": [0.02, 0.0, 0.015],
+          "hue": {
+            "yellow": { "sat": -0.3, "lum": -0.1 },
+            "green": { "hue": 10, "sat": -0.1 },
+            "blue": { "hue": -15 }
+          }
+        },
+        "grain": { "intensity": 0.3, "size": 1.3, "chroma": 0.4, "roughness": 0.3, "response": [1, 0.9, 0.4] },
+        "softness": 0.2,
+        "lens": { "distortion": -0.2, "edgeBlur": 0.3 },
+        "flash": 0.4,
+        "vignette": 0.2,
+        "variation": { "exposure": 0.3, "temperature": 0.1 },
+        "dateStamp": true
+      }
+    },
+    {
+      "id": "party-flash",
+      "name": "Party Flash",
+      "inspiredBy": "Kodak Power Flash",
+      "category": "disposable",
+      "options": { "dateStamp": true },
+      "profiles": [
+        {
+          "id": "default", "name": "Party Flash",
+          "notes": "A bright, harsh flash that falls off fast into a dark vignette.",
+          "look": {}
+        }
+      ],
+      "look": {
+        "aspect": [2, 3],
+        "color": {
+          "saturation": 1.2, "temperature": 0.2, "highlightRolloff": 0.2,
+          "filmCurve": { "contrast": 1.35, "toe": 0.4, "shoulder": 0.5 }
+        },
+        "grain": { "intensity": 0.3, "size": 1.3, "chroma": 0.4, "roughness": 0.3, "response": [1, 0.9, 0.4] },
+        "softness": 0.2,
+        "lens": { "distortion": -0.3, "edgeBlur": 0.3 },
+        "flash": 0.9,
+        "vignette": 0.5,
+        "variation": { "exposure": 0.25, "temperature": 0.1 },
+        "dateStamp": true
+      }
+    },
+    {
+      "id": "bw-snap",
+      "name": "B&W Snap",
+      "inspiredBy": "Ilford XP2 single-use camera",
+      "category": "disposable",
+      "options": { "dateStamp": false },
+      "profiles": [
+        {
+          "id": "default", "name": "B&W Snap",
+          "notes": "Soft black and white from a plastic lens and a little flash.",
+          "look": {}
+        }
+      ],
+      "look": {
+        "aspect": [2, 3],
+        "color": {
+          "monochrome": true, "monoMix": [0.3, 0.59, 0.11], "fade": 0.05, "highlightRolloff": 0.5,
+          "filmCurve": { "contrast": 1.25, "toe": 0.6, "shoulder": 0.6 }
+        },
+        "grain": { "intensity": 0.35, "size": 1.3, "roughness": 0.4, "response": [0.9, 1, 0.5] },
+        "softness": 0.25,
+        "lens": { "distortion": -0.3, "edgeBlur": 0.4 },
+        "flash": 0.5,
+        "vignette": 0.4,
+        "variation": { "exposure": 0.25 }
+      }
+    }
+  ],
+  "aliases": {
+    "gold-200": "slr-35/gold",
+    "portrait-400": "slr-35/portrait",
+    "vivid-100": "slr-35/vivid",
+    "max-400": "slr-35/max",
+    "super-400": "slr-35/super",
+    "pastel-400": "slr-35/pastel",
+    "slide-50": "slide-35/velvia",
+    "chrome-64": "slide-35/kodachrome",
+    "tungsten-800": "cine-35/tungsten",
+    "mono-400": "mono-35/hp5",
+    "grit-400": "mono-35/trix",
+    "muted-chrome": "x-classic/classic-chrome",
+    "street-neg": "x-classic/classic-neg"
+  }
+}

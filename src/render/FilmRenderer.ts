@@ -1,7 +1,9 @@
-import type { FilmPreset } from '@/presets/types'
+import type { FilmPreset, FrameSettings } from '@/presets/types'
 import { isIdentityColor } from '@/presets/types'
+import { srgbToLinear } from './colorTransform'
 import { drawDateStamp } from './dateStampImage'
-import { fullCrop, type CropRect } from './geometry'
+import { drawFrame } from './frameImage'
+import { aspectFillWithin, fullCrop, pictureRect, type CropRect, type Rect } from './geometry'
 import { grainTile, grainTileSize } from './grainTile'
 import { cachedCubeData, defaultLUTDimension } from './lut'
 import { dateStampText, type RenderOptions } from './renderOptions'
@@ -9,6 +11,7 @@ import { SplitMix64 } from './splitmix64'
 import {
   blurShader,
   copyShader,
+  edgeBlurShader,
   finishShader,
   glowShader,
   highlightShader,
@@ -32,20 +35,22 @@ interface Target {
   height: number
 }
 
-type ProgramName = 'source' | 'copy' | 'highlight' | 'blur' | 'glow' | 'light' | 'finish'
+type ProgramName =
+  'source' | 'copy' | 'highlight' | 'blur' | 'edgeBlur' | 'glow' | 'light' | 'finish'
 
 const fragmentShaders: Record<ProgramName, string> = {
   source: sourceShader,
   copy: copyShader,
   highlight: highlightShader,
   blur: blurShader,
+  edgeBlur: edgeBlurShader,
   glow: glowShader,
   light: lightShader,
   finish: finishShader,
 }
 
 /** Blurs are run at a lower resolution so that sigma stays at most this many texels. */
-const maxBlurSigma = 6
+const maxBlurSigma = 3
 
 export class RenderError extends Error {}
 
@@ -71,6 +76,8 @@ export class FilmRenderer {
   private stampTexture: WebGLTexture | null = null
   private stampKey = ''
   private stampSize = { width: 0, height: 0 }
+  private frameTex: WebGLTexture | null = null
+  private frameKey = ''
   private pool = new Map<string, Target[]>()
   private inUse: Target[] = []
   private poolSize = ''
@@ -118,23 +125,31 @@ export class FilmRenderer {
   }
 
   /**
-   * Renders `preset` onto `crop` of `source` and draws it into the canvas at `width`×`height`.
-   * Returns false when the context is lost and nothing was drawn.
+   * Renders `preset` onto `crop` of `source` and draws it into the canvas at
+   * `outputWidth`×`outputHeight`, including the preset's frame. The picture inside the frame
+   * covers the crop, centered. Returns false when the context is lost and nothing was drawn.
    */
   render(
     preset: FilmPreset,
     source: RenderSource,
     options: RenderOptions,
-    width: number,
-    height: number,
+    outputWidth: number,
+    outputHeight: number,
     crop: CropRect = fullCrop,
   ): boolean {
-    if (this.isContextLost || width < 1 || height < 1) return false
+    if (this.isContextLost || outputWidth < 1 || outputHeight < 1) return false
     const gl = this.gl
-    width = Math.round(width)
-    height = Math.round(height)
-    if (this.canvas.width !== width) this.canvas.width = width
-    if (this.canvas.height !== height) this.canvas.height = height
+    outputWidth = Math.round(outputWidth)
+    outputHeight = Math.round(outputHeight)
+    if (this.canvas.width !== outputWidth) this.canvas.width = outputWidth
+    if (this.canvas.height !== outputHeight) this.canvas.height = outputHeight
+    // Every effect works on the picture alone; the frame is added at the end.
+    const pictureShape = preset.aspect
+      ? preset.aspect[0] / preset.aspect[1]
+      : (source.width * crop.width) / (source.height * crop.height)
+    const picture = pictureRect(outputWidth, outputHeight, preset.frame, pictureShape)
+    const { width, height } = picture
+    crop = aspectFillWithin(crop, source.width, source.height, width, height)
     const sizeKey = `${width}x${height}`
     if (this.poolSize !== sizeKey) {
       this.clearPool()
@@ -146,31 +161,92 @@ export class FilmRenderer {
 
     const shortEdge = Math.min(width, height)
 
-    // 1. Crop, scale and color.
+    // 1. Crop, scale, lens, this shot's exposure, and color.
     const useLUT = !isIdentityColor(preset.color)
     let current = this.acquire(width, height)
     this.uploadSource(source)
+    const lens = preset.lens
+    const k = 0.25 * Math.min(Math.max(lens.distortion, -1), 1)
+    // Barrel distortion pulls the corners in, pincushion pushes the middle of the edges out;
+    // scale so the image still fills the frame.
+    const nearestEdge = Math.min(width, height) / Math.hypot(width, height)
+    const distortionScale = k >= 0 ? 1 + k : 1 + k * nearestEdge * nearestEdge
     this.run('source', current, {
       u_source: [0, this.sourceTexture!],
       u_crop: [crop.x, crop.y, crop.width, crop.height],
+      u_size: [width, height],
+      u_distortion: k,
+      u_distortionScale: distortionScale,
+      u_aberration: 0.012 * Math.min(Math.max(lens.chromaticAberration, 0), 1),
+      u_gain: shotGain(preset, options.seed),
       u_useLUT: useLUT,
       // Always bind the 3D sampler to its own unit: samplers of different types may not share one.
       u_lut: [1, useLUT ? this.lut(preset.color) : null, gl.TEXTURE_3D],
       u_lutSize: defaultLUTDimension,
     })
 
-    // 2. Halation: red-orange glow around bright highlights.
+    // 2. Blur: a lens that is soft away from the center, or a soft print overall.
+    if (lens.edgeBlur > 0 || lens.blur > 0) {
+      const edge = Math.min(lens.edgeBlur, 1)
+      const overall = Math.min(lens.blur, 1)
+      const sigma = Math.max(0.003 + 0.009 * edge, 0.0015 + 0.003 * overall)
+      const blurred = this.blur(current, shortEdge * sigma)
+      const next = this.acquire(width, height)
+      this.run('edgeBlur', next, {
+        u_source: [0, current.texture],
+        u_blurred: [1, blurred.texture],
+        u_size: [width, height],
+        u_edgeAmount: edge > 0 ? Math.min(1, 0.5 + edge) : 0,
+        u_overall: overall > 0 ? Math.min(1, 0.4 + 0.6 * overall) : 0,
+      })
+      this.release(blurred)
+      this.release(current)
+      current = next
+    }
+
+    // 3. Halation: a red-orange glow around bright highlights, tight near them and wider
+    // further out, from light scattering back through the film base.
     if (preset.halation && preset.halation.intensity > 0) {
+      const h = preset.halation
+      const amount = Math.min(h.intensity, 1)
       const highlights = this.acquire(width, height)
-      this.run('highlight', highlights, { u_source: [0, current.texture] })
-      const glow = this.blur(highlights, shortEdge * 0.015 * preset.halation.radius)
+      this.run('highlight', highlights, {
+        u_source: [0, current.texture],
+        u_threshold: h.threshold,
+      })
+      const tight = this.blur(highlights, shortEdge * 0.008 * h.radius)
       this.release(highlights)
-      const k = Math.min(preset.halation.intensity, 1)
-      current = this.glow(current, glow, [k, 0.25 * k, 0.08 * k])
+      current = this.glow(
+        current,
+        tight,
+        h.color.map((c) => 0.7 * c * amount),
+      )
+      const wide = this.blur(tight, shortEdge * 0.02 * h.radius)
+      this.release(tight)
+      current = this.glow(
+        current,
+        wide,
+        h.color.map((c) => 0.6 * c * amount),
+      )
+      this.release(wide)
+    }
+
+    // 4. Bloom: a soft white glow around bright areas.
+    if (preset.bloom && preset.bloom.intensity > 0) {
+      const b = preset.bloom
+      const highlights = this.acquire(Math.ceil(width / 2), Math.ceil(height / 2))
+      this.run('highlight', highlights, {
+        u_source: [0, current.texture],
+        u_threshold: b.threshold,
+      })
+      const glow = this.blur(highlights, shortEdge * 0.0175 * b.radius)
+      this.release(highlights)
+      const amount = 0.8 * Math.min(b.intensity, 1)
+      current = this.glow(current, glow, [amount, amount, amount])
       this.release(glow)
     }
 
-    // 3. Softness: the glow of a cheap plastic lens.
+    // 5. Softness: the glow of a cheap plastic lens.
     if (preset.softness > 0) {
       const glow = this.blur(current, shortEdge * 0.02)
       const k = 0.8 * Math.min(preset.softness, 1)
@@ -178,43 +254,41 @@ export class FilmRenderer {
       this.release(glow)
     }
 
-    // 4–6. Flash, vignette and light leak.
+    // 6. Flash, vignette and light leak.
     const leak = preset.lightLeak && preset.lightLeak.intensity > 0 ? preset.lightLeak : undefined
-    if (preset.flash > 0 || preset.vignette > 0 || leak) {
-      let leakUniforms = {}
-      if (leak) {
-        const rng = new SplitMix64(options.seed ^ 0x4c45414bn)
-        const fromLeft = rng.nextBool()
-        const y = height * rng.nextDouble(0.2, 0.8)
-        const k = Math.min(leak.intensity, 1)
-        leakUniforms = {
-          u_leakCenter: [fromLeft ? 0 : width, y],
-          u_leakRadius: shortEdge * 0.9,
-          u_leakColor: leak.color.map((c) => c * k),
-        }
-      }
+    const leakUniforms = leak ? lightLeakUniforms(leak, options.seed, width, height) : undefined
+    if (preset.flash > 0 || preset.vignette > 0 || leakUniforms) {
       const next = this.acquire(width, height)
       this.run('light', next, {
         u_source: [0, current.texture],
         u_size: [width, height],
         u_flash: Math.min(preset.flash, 1),
+        u_flashColor: [...preset.flashColor],
         u_vignette: Math.min(preset.vignette, 1),
-        u_leak: !!leak,
+        u_leak: !!leakUniforms,
         ...leakUniforms,
       })
       this.release(current)
       current = next
     }
 
-    // 7–8. Grain and date stamp, drawn straight into the canvas.
+    // 7–9. Grain, date stamp and frame, drawn straight into the canvas.
     const uniforms: Uniforms = {
       u_source: [0, current.texture],
-      u_size: [width, height],
+      u_size: [outputWidth, outputHeight],
+      // In the shader's coordinates, with the origin at the bottom left.
+      u_picture: [picture.x, outputHeight - picture.y - height, width, height],
       u_grain: false,
       u_stamp: false,
+      u_frame: false,
+      u_jitter: [0, 0, 0],
     }
     if (preset.grain && preset.grain.intensity > 0) {
-      const scale = Math.max(1, (shortEdge / 1500) * preset.grain.size)
+      const g = preset.grain
+      // Grain is sized relative to the image. When a grain is smaller than a pixel, as in the
+      // viewfinder, it is weaker instead, the way a full-size photo looks when shrunk to fit.
+      const relative = (shortEdge / 1500) * g.size
+      const scale = Math.max(1, relative)
       // Each seed starts the tile at a different spot.
       const rng = new SplitMix64(options.seed)
       const offsetX = rng.nextInt(grainTileSize) * scale
@@ -224,16 +298,20 @@ export class FilmRenderer {
         u_noise: [1, this.noise()],
         u_noiseOffset: [offsetX, offsetY],
         u_noiseScale: scale,
-        u_grainAmount: Math.min(preset.grain.intensity, 1) * 1.5,
+        u_grainAmount: Math.min(g.intensity, 1) * 1.5 * Math.min(1, relative),
+        u_grainChroma: preset.color.monochrome ? 0 : Math.min(Math.max(g.chroma, 0), 1),
+        u_grainRoughness: Math.min(Math.max(g.roughness, 0), 1),
+        u_grainResponse: [...g.response],
       })
     }
     if (preset.dateStamp) {
       const fontSize = Math.max(shortEdge * 0.045, 8)
-      const stamp = this.stamp(dateStampText(options.date), fontSize)
+      const stamp = this.stamp(dateStampText(options.date), fontSize, preset.dateStampColor)
       const margin = shortEdge * 0.05
       Object.assign(uniforms, {
         u_stamp: true,
         u_stampTexture: [2, stamp],
+        // In picture pixels, origin at the bottom left.
         u_stampRect: [
           width - margin - this.stampSize.width,
           margin,
@@ -242,7 +320,27 @@ export class FilmRenderer {
         ],
       })
     }
-    this.run('finish', null, uniforms, width, height)
+    if (preset.frame) {
+      const rng = new SplitMix64(options.seed ^ 0x4652414dn)
+      const frameNumber = 1 + rng.nextInt(36)
+      Object.assign(uniforms, {
+        u_frame: true,
+        u_frameTexture: [
+          3,
+          this.frameTexture(preset.frame, outputWidth, outputHeight, picture, frameNumber),
+        ],
+        u_frameBase: cssColorToLinear(preset.frame.color),
+      })
+      if (preset.jitter) {
+        // Gate weave: the film sits a little off-center and crooked in the scanner.
+        uniforms.u_jitter = [
+          shortEdge * rng.nextDouble(-0.012, 0.012),
+          shortEdge * rng.nextDouble(-0.012, 0.012),
+          (rng.nextDouble(-0.4, 0.4) * Math.PI) / 180,
+        ]
+      }
+    }
+    this.run('finish', null, uniforms, outputWidth, outputHeight)
     this.release(current)
     this.releaseAll()
     return true
@@ -264,6 +362,7 @@ export class FilmRenderer {
 
   // MARK: - Passes
 
+  /** A Gaussian blur of `source`, possibly at a lower resolution. `sigma` is in its pixels. */
   private blur(source: Target, sigma: number): Target {
     // Halve the resolution until sigma is small enough for a short kernel.
     let current = source
@@ -298,9 +397,23 @@ export class FilmRenderer {
     return vertical
   }
 
-  private glow(base: Target, glow: Target, tint: number[]): Target {
+  private glow(
+    base: Target,
+    glow: Target,
+    tint: number[],
+    second?: Target,
+    secondTint?: number[],
+  ): Target {
     const next = this.acquire(base.width, base.height)
-    this.run('glow', next, { u_source: [0, base.texture], u_glow: [1, glow.texture], u_tint: tint })
+    this.run('glow', next, {
+      u_source: [0, base.texture],
+      u_glow: [1, glow.texture],
+      u_tint: tint,
+      u_second: !!second,
+      // Always bind the second sampler, even unused, so it never shares a unit with the first.
+      u_glow2: [2, (second ?? glow).texture],
+      u_tint2: secondTint ?? [0, 0, 0],
+    })
     this.release(base)
     return next
   }
@@ -428,15 +541,15 @@ export class FilmRenderer {
     if (!this.noiseTexture) {
       this.noiseTexture = this.createTexture(gl.TEXTURE_2D, gl.REPEAT)
       gl.pixelStorei(gl.UNPACK_ALIGNMENT, 1)
-      // Plain R8, no color space: the values are used as-is, so mid-gray stays exactly neutral.
+      // Plain RGB8, no color space: the values are used as-is, so mid-gray stays exactly neutral.
       gl.texImage2D(
         gl.TEXTURE_2D,
         0,
-        gl.R8,
+        gl.RGB8,
         grainTileSize,
         grainTileSize,
         0,
-        gl.RED,
+        gl.RGB,
         gl.UNSIGNED_BYTE,
         grainTile(),
       )
@@ -445,12 +558,12 @@ export class FilmRenderer {
     return this.noiseTexture
   }
 
-  private stamp(text: string, fontSize: number): WebGLTexture {
+  private stamp(text: string, fontSize: number, color: string): WebGLTexture {
     const gl = this.gl
     if (!this.stampTexture) this.stampTexture = this.createTexture()
-    const key = `${text}@${fontSize.toFixed(2)}`
+    const key = `${text}@${fontSize.toFixed(2)}@${color}`
     if (this.stampKey !== key) {
-      const canvas = drawDateStamp(text, fontSize)
+      const canvas = drawDateStamp(text, fontSize, color)
       gl.bindTexture(gl.TEXTURE_2D, this.stampTexture)
       gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, false)
       gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, false)
@@ -459,6 +572,27 @@ export class FilmRenderer {
       this.stampSize = { width: canvas.width, height: canvas.height }
     }
     return this.stampTexture!
+  }
+
+  private frameTexture(
+    frame: FrameSettings,
+    width: number,
+    height: number,
+    picture: Rect,
+    frameNumber: number,
+  ): WebGLTexture {
+    const gl = this.gl
+    if (!this.frameTex) this.frameTex = this.createTexture()
+    const key = [frame.style, frame.color, frame.text, width, height, frameNumber].join('|')
+    if (this.frameKey !== key) {
+      const canvas = drawFrame(frame, width, height, picture, frameNumber)
+      gl.bindTexture(gl.TEXTURE_2D, this.frameTex)
+      gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, false)
+      gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, false)
+      gl.texImage2D(gl.TEXTURE_2D, 0, gl.SRGB8_ALPHA8, gl.RGBA, gl.UNSIGNED_BYTE, canvas)
+      this.frameKey = key
+    }
+    return this.frameTex!
   }
 
   private acquire(width: number, height: number): Target {
@@ -509,7 +643,13 @@ export class FilmRenderer {
     if (!gl.isContextLost()) {
       this.clearPool()
       for (const { program } of this.programs.values()) gl.deleteProgram(program)
-      for (const t of [this.sourceTexture, this.lutTexture, this.noiseTexture, this.stampTexture]) {
+      for (const t of [
+        this.sourceTexture,
+        this.lutTexture,
+        this.noiseTexture,
+        this.stampTexture,
+        this.frameTex,
+      ]) {
         if (t) gl.deleteTexture(t)
       }
       if (this.vao) gl.deleteVertexArray(this.vao)
@@ -526,6 +666,61 @@ export class FilmRenderer {
     this.noiseTexture = null
     this.stampTexture = null
     this.stampKey = ''
+    this.frameTex = null
+    this.frameKey = ''
+  }
+}
+
+/** A `#rrggbb` color in linear light, for the film base around a weaving frame. */
+function cssColorToLinear(color: string): number[] {
+  const match = /^#([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})$/i.exec(color)
+  if (!match) return [0, 0, 0]
+  return match.slice(1).map((hex) => srgbToLinear(parseInt(hex, 16) / 255))
+}
+
+/** This shot's exposure and white balance change, as a linear gain per channel. */
+function shotGain(preset: FilmPreset, seed: bigint): number[] {
+  const { exposure, temperature } = preset.variation
+  if (exposure === 0 && temperature === 0) return [1, 1, 1]
+  const rng = new SplitMix64(seed ^ 0x56415259n)
+  const stops = rng.nextDouble(-exposure, exposure)
+  const warmth = rng.nextDouble(-temperature, temperature)
+  const gain = Math.pow(2, stops)
+  return [gain * (1 + 0.12 * warmth), gain, gain * (1 - 0.12 * warmth)]
+}
+
+/** One to three seeded glowing blobs along the left or right edge. */
+function lightLeakUniforms(
+  leak: NonNullable<FilmPreset['lightLeak']>,
+  seed: bigint,
+  width: number,
+  height: number,
+): Uniforms | undefined {
+  const rng = new SplitMix64(seed ^ 0x4c45414bn)
+  if (rng.nextDouble() >= leak.chance) return undefined
+  const shortEdge = Math.min(width, height)
+  const fromLeft = rng.nextBool()
+  const count = 1 + rng.nextInt(3)
+  const k = Math.min(leak.intensity, 1)
+  const blobs: number[][] = []
+  const strengths: number[] = []
+  for (let i = 0; i < 3; i++) {
+    const inset = shortEdge * rng.nextDouble(-0.15, 0.1)
+    const x = fromLeft ? inset : width - inset
+    const y = height * rng.nextDouble(0.1, 0.9)
+    // Leaks come in through the film's edge, so they are longer along it than across.
+    const across = shortEdge * rng.nextDouble(0.25, 0.6)
+    const along = shortEdge * rng.nextDouble(0.4, 1.1)
+    blobs.push([x, y, across, along])
+    strengths.push(i < count ? k * rng.nextDouble(0.6, 1.2) : 0)
+  }
+  return {
+    u_leak0: blobs[0]!,
+    u_leak1: blobs[1]!,
+    u_leak2: blobs[2]!,
+    u_leakStrength: strengths,
+    u_leakColor: [...leak.color],
+    u_leakEdgeColor: [...leak.edgeColor],
   }
 }
 

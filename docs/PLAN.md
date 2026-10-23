@@ -193,10 +193,49 @@ This replaces Core Image. Everything runs in fragment shaders over textures.
   Android Chrome. Check a smooth viewfinder (~30 fps), capture, flash (Android), front camera,
   sharing to Photos, and the gallery after a reload.
 
+## Film realism: Dazz-style cameras
+
+After the port, the looks were reworked to feel more like real film, modeled on how
+[Dazz Cam](https://apps.apple.com/us/app/1422471180) organizes its cameras. A Dazz camera
+is a bundle: one or more color profiles with hue-specific traits, a picture shape, a frame,
+lens defects, and toggles for a light leak, date stamp and jitter. The presets were tinted
+photos; now they are cameras. The PWA's looks diverge from the iOS app's from here on.
+
+1. ✅ **Color engine** (`colorTransform.ts`, all baked into the LUT): film characteristic
+   curves with toe, shoulder and per-channel contrast (color crossover), eight hue bands
+   (hue, saturation, lightness), a 3×3 channel matrix, tone-dependent saturation, and
+   digital highlight clipping.
+2. ✅ **Grain:** an RGB noise tile for color grain, clumping, strength per tone (shadows,
+   midtones, highlights), and grain that weakens instead of coarsening below one pixel, so
+   the viewfinder matches the saved photo shrunk to fit.
+3. ✅ **Optics and light:** barrel and pincushion distortion and chromatic aberration in the
+   source pass, edge and overall blur, a two-radius halation with a soft threshold and a
+   color, bloom, colored flash, seeded multi-blob light leaks that can skip shots, and
+   per-shot exposure and white balance variation.
+4. ✅ **Cameras** (`cameras.json`, `CameraLibrary`): profiles merged over a camera's base
+   look, options, paper colors, and aliases for the old preset ids. The picker shows
+   categories, cameras, profiles and toggles, and each camera remembers its choices.
+5. ✅ **Shapes and frames:** each camera's picture shape sets the viewfinder and photo; the
+   editor turns it to match landscape photos. Frames (Instax Mini and Square, white instant,
+   35mm with sprocket holes and edge print, 120, slide mount) are drawn with Canvas 2D at
+   real proportions and composited in the last pass, with optional gate weave. The date
+   stamp uses seven-segment digits.
+6. ✅ **Lineup and tooling:** 25 cameras in five categories, a photographic test scene
+   (ColorChecker, lit skin tones, foliage, lamp), a contact sheet of every profile, and
+   `tune.html` for tuning looks live.
+
+Not planned: video cameras, 3D, stop-motion and collage cameras.
+
 ## Future work
 
 - Tiled export, so photos over 16 MP keep their full resolution on iOS.
 - Copy EXIF (capture date, GPS) into saved JPEGs from library photos, e.g. with piexifjs.
 - Display P3 output where the browser supports it (`drawingBufferColorSpace`).
+- Tune the looks against real photos on real phones; the synthetic scene only gets close.
+- Procedural dust and scratches for slide and expired looks.
+- A half-frame camera that stitches two shots into one diptych.
+- Accessories: fisheye, star filter, double exposure.
+- White balance and exposure controls. Chrome on Android can fix the camera's white balance
+  (`whiteBalanceMode: 'manual'`) for cameras that shoot daylight-balanced.
 - Preset thumbnails on the chips, from one bundled sample photo.
 - Tune the looks side by side with the iOS contact sheet.

@@ -5,10 +5,12 @@ import AppIcon from '@/components/AppIcon.vue'
 import PresetPicker from '@/components/PresetPicker.vue'
 import { useAlert } from '@/composables/useAlert'
 import { addPhoto } from '@/gallery/db'
-import { defaultEditorPresetId, presetLibrary, presetOrDefault } from '@/presets/library'
+import { useCameraSelection } from '@/composables/useCameraSelection'
+import { cameraLibrary, defaultEditorCameraId } from '@/presets/library'
 import type { FilmPreset } from '@/presets/types'
 import { encodePhoto, type EncodedPhoto } from '@/render/encode'
 import { FilmRenderer } from '@/render/FilmRenderer'
+import { photoSize, pictureAspect } from '@/render/geometry'
 import { newRenderOptions, type RenderOptions } from '@/render/renderOptions'
 import { takePendingPhoto } from '@/photo/pendingPhoto'
 import { useSharePhoto } from '@/composables/useSharePhoto'
@@ -21,11 +23,14 @@ const router = useRouter()
 const alerts = useAlert()
 const sharePhoto = useSharePhoto()
 
-const preset = shallowRef<FilmPreset>(
-  presetOrDefault(
-    typeof route.query.preset === 'string' ? route.query.preset : null,
-    defaultEditorPresetId,
-  ),
+const {
+  camera: selectedCamera,
+  choice,
+  look,
+} = useCameraSelection(
+  null,
+  defaultEditorCameraId,
+  typeof route.query.preset === 'string' ? route.query.preset : null,
 )
 const photo = shallowRef<SourcePhoto | null>(null)
 const isLoading = ref(true)
@@ -38,10 +43,10 @@ let renderer: FilmRenderer | null = null
 /** Picked once per photo, so grain and light leaks match between preview and saved photo. */
 let options: RenderOptions = newRenderOptions()
 /** The last full-resolution render, reused when the same look is saved and shared. */
-let encoded: { presetId: string; photo: EncodedPhoto } | null = null
-let savedPresetId: string | null = null
+let encoded: { look: FilmPreset; photo: EncodedPhoto } | null = null
+let savedLook: FilmPreset | null = null
 
-const clean = presetLibrary.preset('clean')!
+const clean = cameraLibrary.look('clean')!
 
 function close() {
   if (window.history.state?.back) router.back()
@@ -52,24 +57,23 @@ function draw() {
   const p = photo.value
   if (!p || !renderer) return
   const source = { image: p.preview, width: p.preview.width, height: p.preview.height }
-  renderer.render(
-    showOriginal.value ? clean : preset.value,
-    source,
-    options,
-    source.width,
-    source.height,
-  )
+  const shown = showOriginal.value ? clean : look.value
+  const aspect = pictureAspect(shown.aspect, source.width, source.height, true)
+  const size = photoSize(aspect, shown.frame, source.width, source.height)
+  renderer.render(shown, source, options, size.width, size.height)
 }
 
 async function fullResolution(): Promise<EncodedPhoto> {
   const p = photo.value!
-  if (encoded?.presetId !== preset.value.id) {
+  const current = look.value
+  if (encoded?.look !== current) {
     const result = await encodePhoto(
-      preset.value,
+      current,
       { image: p.full, width: p.width, height: p.height },
       options,
+      { matchOrientation: true },
     )
-    encoded = { presetId: preset.value.id, photo: result }
+    encoded = { look: current, photo: result }
   }
   return encoded.photo
 }
@@ -79,16 +83,17 @@ async function save() {
   isWorking.value = true
   try {
     const result = await fullResolution()
-    if (savedPresetId !== preset.value.id) {
+    const saved = encoded!.look
+    if (savedLook !== saved) {
       await addPhoto({
         blob: result.blob,
         thumbnail: result.thumbnail,
-        presetId: preset.value.id,
-        presetName: preset.value.name,
+        presetId: saved.id,
+        presetName: saved.name,
         width: result.width,
         height: result.height,
       })
-      savedPresetId = preset.value.id
+      savedLook = saved
     }
     alerts.saved()
   } catch {
@@ -144,7 +149,7 @@ onBeforeUnmount(() => {
   if (photo.value?.preview !== photo.value?.full) photo.value?.preview.close()
 })
 
-watch([preset, showOriginal], draw)
+watch([look, showOriginal], draw)
 </script>
 
 <template>
@@ -180,7 +185,7 @@ watch([preset, showOriginal], draw)
       <canvas
         ref="canvas"
         role="img"
-        :aria-label="photo ? `Photo with the ${preset.name} look` : 'Loading photo'"
+        :aria-label="photo ? `Photo with the ${look.name} look` : 'Loading photo'"
         :class="{ hidden: !photo }"
       />
       <div v-if="isLoading" class="status">Opening photo…</div>
@@ -188,7 +193,7 @@ watch([preset, showOriginal], draw)
     </div>
     <p class="hint">Touch and hold the photo to see the original.</p>
 
-    <PresetPicker v-model="preset" />
+    <PresetPicker v-model:camera="selectedCamera" v-model:choice="choice" />
   </main>
 </template>
 

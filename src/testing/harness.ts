@@ -1,8 +1,9 @@
 // Exposes the renderer to the Playwright tests. Only built with `vite build --mode test`.
-import { decodePreset, presetLibrary } from '@/presets/library'
+import { cameraLibrary, decodePreset } from '@/presets/library'
 import type { FilmPreset } from '@/presets/types'
 import { encodePhoto } from '@/render/encode'
 import { FilmRenderer } from '@/render/FilmRenderer'
+import { framedAspect } from '@/render/geometry'
 import { drawTestScene, solidImage } from './testScene'
 
 let renderer: FilmRenderer | undefined
@@ -13,7 +14,7 @@ function getRenderer() {
 }
 
 export interface RenderRequest {
-  /** A bundled preset id, or a preset object in the presets.json format. */
+  /** A camera, "camera/profile" or old preset id, or a look object in the cameras.json format. */
   preset: string | Record<string, unknown>
   width?: number
   height?: number
@@ -25,7 +26,7 @@ export interface RenderRequest {
 
 function resolvePreset(preset: RenderRequest['preset']): FilmPreset {
   if (typeof preset === 'string') {
-    const found = presetLibrary.preset(preset)
+    const found = cameraLibrary.look(preset)
     if (!found) throw new Error(`No preset ${preset}`)
     return found
   }
@@ -71,6 +72,25 @@ function render(request: RenderRequest) {
   }
 }
 
+/** Average milliseconds per render, waiting for the GPU to finish. */
+function time(request: RenderRequest, runs = 5) {
+  const r = getRenderer()
+  const src = source(request)
+  const preset = resolvePreset(request.preset)
+  const options = { seed: 1n, date: new Date() }
+  const pixel = new Uint8Array(4)
+  // Reading one pixel waits for the GPU; finish() alone doesn't in every browser.
+  const sync = () => r.gl.readPixels(0, 0, 1, 1, r.gl.RGBA, r.gl.UNSIGNED_BYTE, pixel)
+  r.render(preset, src, options, src.width, src.height)
+  sync()
+  const start = performance.now()
+  for (let i = 0; i < runs; i++) {
+    r.render(preset, src, options, src.width, src.height)
+    sync()
+  }
+  return (performance.now() - start) / runs
+}
+
 async function encode(request: RenderRequest) {
   const src = source(request)
   const photo = await encodePhoto(resolvePreset(request.preset), src, {
@@ -81,37 +101,50 @@ async function encode(request: RenderRequest) {
   return { type: photo.blob.type, width: bitmap.width, height: bitmap.height }
 }
 
-/** Every preset on the test scene, labeled, as a PNG data URL. */
-function contactSheet(cell = 360) {
-  const presets = presetLibrary.presets
+/** Every look, or the ones given, on the test scene, labeled, as a PNG data URL. */
+function contactSheet(cell = 360, ids?: string[]) {
+  const presets = ids ? ids.map((id) => resolvePreset(id)) : cameraLibrary.looks
   const columns = 4
-  const height = Math.round((cell * 3) / 4)
+  const box = Math.round(cell * 1.1)
   const label = 28
   const sheet = document.createElement('canvas')
   sheet.width = columns * cell
-  sheet.height = Math.ceil(presets.length / columns) * (height + label)
+  sheet.height = Math.ceil(presets.length / columns) * (box + label)
   const ctx = sheet.getContext('2d')!
   ctx.fillStyle = '#111'
   ctx.fillRect(0, 0, sheet.width, sheet.height)
   const r = getRenderer()
-  const scene = { image: drawTestScene(cell, height), width: cell, height }
   presets.forEach((preset, i) => {
-    r.render(preset, scene, { seed: 7n, date: new Date('1998-10-12T12:00:00') }, cell, height)
+    // Each look at its own shape, frame included, as large as fits in its cell, on a scene
+    // drawn at the picture's shape.
+    const shape = preset.aspect ?? [3, 4]
+    const aspect = framedAspect(shape, preset.frame)
+    const width = Math.round(aspect > cell / box ? cell : box * aspect)
+    const height = Math.round(width / aspect)
+    const sceneWidth = Math.round(Math.sqrt((cell * cell * shape[0]) / shape[1]))
+    const sceneHeight = Math.round((sceneWidth * shape[1]) / shape[0])
+    const scene = {
+      image: drawTestScene(sceneWidth, sceneHeight),
+      width: sceneWidth,
+      height: sceneHeight,
+    }
+    r.render(preset, scene, { seed: 7n, date: new Date('1998-10-12T12:00:00') }, width, height)
     const x = (i % columns) * cell
-    const y = Math.floor(i / columns) * (height + label)
-    ctx.drawImage(r.canvas, x, y)
+    const y = Math.floor(i / columns) * (box + label)
+    ctx.drawImage(r.canvas, x + (cell - width) / 2, y + (box - height) / 2)
     ctx.fillStyle = '#fff'
-    ctx.font = '16px sans-serif'
-    ctx.fillText(`${preset.name} (${preset.category})`, x + 8, y + height + 20)
+    ctx.font = '15px sans-serif'
+    ctx.fillText(preset.name, x + 8, y + box + 20)
   })
   return sheet.toDataURL('image/png')
 }
 
 const harness = {
   render,
+  time,
   encode,
   contactSheet,
-  presetIds: () => presetLibrary.presets.map((p) => p.id),
+  presetIds: () => cameraLibrary.looks.map((p) => p.id),
   supported: () => FilmRenderer.isSupported(),
 }
 
