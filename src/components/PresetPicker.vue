@@ -151,7 +151,7 @@ watch(category, () =>
   padding: 6px 0;
   border-radius: 7px;
   color: var(--text);
-  font-size: 0.8rem;
+  font-size: 0.75rem;
   font-weight: 600;
 }
 

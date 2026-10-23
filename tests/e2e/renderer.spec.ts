@@ -199,6 +199,56 @@ test('halation, bloom and edge blur render', async ({ page }) => {
   expect(meanDifference(out.pixels, out.original)).toBeGreaterThan(1)
 })
 
+test('frames surround the picture, and the date stays on the picture', async ({ page }) => {
+  // A 300×400 picture in an Instax Mini print: 8.7% and 13% borders, 39% at the bottom.
+  const width = 352
+  const height = 556
+  const out = await render(page, {
+    preset: {
+      id: 'mini',
+      name: 'Mini',
+      category: 'instant',
+      aspect: [3, 4],
+      frame: { style: 'instax-mini' },
+      dateStamp: true,
+    },
+    solid: '#3060c0',
+    width,
+    height,
+  })
+  const at = (x: number, y: number) =>
+    out.pixels.slice((y * width + x) * 4, (y * width + x) * 4 + 3)
+  const [r, , b] = at(width / 2, 200)
+  expect(b).toBeGreaterThan(r! + 60)
+  // Paper in the corner and in the wide bottom border.
+  expect(Math.min(...at(4, 4))).toBeGreaterThan(200)
+  expect(Math.min(...at(width / 2, height - 40))).toBeGreaterThan(200)
+  const pictureBottom = Math.round(0.13 * 300 + 400)
+  const { inside, outside } = countOrange(out, (_, y) => y <= pictureBottom)
+  expect(inside).toBeGreaterThan(50)
+  expect(outside).toBe(0)
+})
+
+test('film frames weave with the seed', async ({ page }) => {
+  const preset = {
+    id: 'strip',
+    name: 'Strip',
+    category: 'film135',
+    aspect: [2, 3],
+    frame: { style: 'film-35', text: 'PF 400' },
+    jitter: true,
+  }
+  const size = { width: 270, height: 380 }
+  const a = await render(page, { preset, seed: '3', ...size })
+  const b = await render(page, { preset, seed: '3', ...size })
+  const c = await render(page, { preset, seed: '4', ...size })
+  expect(maxDifference(a.pixels, b.pixels)).toBe(0)
+  expect(meanDifference(a.pixels, c.pixels)).toBeGreaterThan(1)
+  // Sprocket holes show as light marks in the dark rebate.
+  const light = a.pixels.filter((v, i) => i % 4 === 1 && (i / 4) % size.width < 20 && v > 180)
+  expect(light.length).toBeGreaterThan(20)
+})
+
 test("photos are encoded as JPEG at full size, in the look's shape", async ({ page }) => {
   const encode = (preset: string) =>
     page.evaluate((p) => window.harness.encode({ preset: p, width: 1200, height: 900 }), preset)

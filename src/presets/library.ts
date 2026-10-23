@@ -294,7 +294,7 @@ export function decodePreset(value: unknown, path = 'preset'): FilmPreset {
 }
 
 /** Merges JSON objects key by key, so a profile only lists what it changes. */
-function mergeJSON(base: unknown, override: unknown): unknown {
+export function mergeJSON(base: unknown, override: unknown): unknown {
   const isObject = (v: unknown): v is Json =>
     typeof v === 'object' && v !== null && !Array.isArray(v)
   if (!isObject(base) || !isObject(override)) return override === undefined ? base : override

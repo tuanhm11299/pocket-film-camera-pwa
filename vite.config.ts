@@ -9,7 +9,8 @@ const base = process.env.BASE_PATH ?? '/pocket-film-camera-pwa/'
 
 // https://vite.dev/config/
 export default defineConfig(({ mode }) => {
-  // `--mode test` also builds the renderer test harness used by the Playwright tests.
+  // `--mode test` also builds the renderer test harness used by the Playwright tests and the
+  // look tuner (tune.html, which `npm run dev` serves too).
   const isTest = mode === 'test'
   return {
     base,
@@ -43,8 +44,8 @@ export default defineConfig(({ mode }) => {
         },
         workbox: {
           globPatterns: ['**/*.{js,css,html,svg,png,woff2}'],
-          globIgnores: ['test-harness.html'],
-          navigateFallbackDenylist: [/test-harness/],
+          globIgnores: ['test-harness.html', 'tune.html'],
+          navigateFallbackDenylist: [/test-harness/, /tune/],
         },
       }),
     ],
@@ -59,7 +60,10 @@ export default defineConfig(({ mode }) => {
         input: {
           main: fileURLToPath(new URL('./index.html', import.meta.url)),
           ...(isTest
-            ? { harness: fileURLToPath(new URL('./test-harness.html', import.meta.url)) }
+            ? {
+                harness: fileURLToPath(new URL('./test-harness.html', import.meta.url)),
+                tune: fileURLToPath(new URL('./tune.html', import.meta.url)),
+              }
             : {}),
         },
       },
