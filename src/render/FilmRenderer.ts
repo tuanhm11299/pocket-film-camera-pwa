@@ -209,25 +209,24 @@ export class FilmRenderer {
     if (preset.halation && preset.halation.intensity > 0) {
       const h = preset.halation
       const amount = Math.min(h.intensity, 1)
-      const highlights = this.acquire(width, height)
+      // The highlights are found at half size: the glow is blurred anyway.
+      const highlights = this.acquire(Math.ceil(width / 2), Math.ceil(height / 2))
       this.run('highlight', highlights, {
         u_source: [0, current.texture],
         u_threshold: h.threshold,
       })
-      const tight = this.blur(highlights, shortEdge * 0.008 * h.radius)
+      const tight = this.blur(highlights, shortEdge * 0.004 * h.radius)
       this.release(highlights)
+      // Blurs may return a smaller target; sigma is in that target's pixels.
+      const wide = this.blur(tight, shortEdge * 0.02 * h.radius * (tight.width / width))
       current = this.glow(
         current,
         tight,
         h.color.map((c) => 0.7 * c * amount),
-      )
-      const wide = this.blur(tight, shortEdge * 0.02 * h.radius)
-      this.release(tight)
-      current = this.glow(
-        current,
         wide,
         h.color.map((c) => 0.6 * c * amount),
       )
+      this.release(tight)
       this.release(wide)
     }
 
