@@ -56,7 +56,13 @@ describe('PresetLibrary', () => {
     const preset = library.presets[0]!
     expect(preset.inspiredBy).toBeUndefined()
     expect(isIdentityColor(preset.color)).toBe(true)
-    expect(preset.grain).toEqual({ intensity: 0.2, size: 1 })
+    expect(preset.grain).toEqual({
+      intensity: 0.2,
+      size: 1,
+      chroma: 0,
+      roughness: 0,
+      response: [1, 1, 1],
+    })
     expect(preset.dateStamp).toBe(false)
     expect(preset.lightLeak).toBeUndefined()
   })
@@ -65,7 +71,12 @@ describe('PresetLibrary', () => {
     const library = PresetLibrary.decode({
       presets: [{ id: 'x', name: 'X', category: 'disposable', lightLeak: { intensity: 0.3 } }],
     })
-    expect(library.presets[0]!.lightLeak).toEqual({ intensity: 0.3, color: [1, 0.45, 0.15] })
+    expect(library.presets[0]!.lightLeak).toEqual({
+      intensity: 0.3,
+      color: [1, 0.45, 0.15],
+      edgeColor: [1, 0.75, 0.3],
+      chance: 1,
+    })
   })
 
   it('rejects a curve with decreasing x', () => {

@@ -107,6 +107,15 @@ export interface GrainSettings {
   intensity: number
   /** Relative grain size; 1 is typical 35mm grain. */
   size: number
+  /** 0 (black and white grain) ... 1 (independent grain per color layer, or sensor noise). */
+  chroma: number
+  /** Adds coarser clumps to the fine grain, 0...1. */
+  roughness: number
+  /**
+   * Grain strength in the shadows, midtones and highlights. Negative film has little grain
+   * in the highlights; digital sensor noise is strongest in the shadows.
+   */
+  response: Vec3
 }
 
 export interface HalationSettings {
@@ -114,14 +123,52 @@ export interface HalationSettings {
   intensity: number
   /** Relative glow radius. */
   radius: number
+  /** RGB color of the glow. */
+  color: Vec3
+  /** Brightness (0...1) where highlights start to glow. */
+  threshold: number
+}
+
+/** A soft white glow around the bright parts of the image, like diffusion or old coatings. */
+export interface BloomSettings {
+  /** 0...1. */
+  intensity: number
+  /** Relative glow radius. */
+  radius: number
+  /** Brightness (0...1) where the glow starts. */
+  threshold: number
 }
 
 export interface LightLeakSettings {
   /** 0...1. */
   intensity: number
-  /** RGB color of the leak. */
+  /** RGB color at the hot core of the leak. */
   color: Vec3
+  /** RGB color the leak fades through toward its edge. */
+  edgeColor: Vec3
+  /** How likely a shot is to have a leak, 0...1. */
+  chance: number
 }
+
+export interface LensSettings {
+  /** Positive bulges the image like a cheap wide lens (barrel), negative pinches it (pincushion). -1...1. */
+  distortion: number
+  /** Red and blue fringes toward the edges, 0...1. */
+  chromaticAberration: number
+  /** Out-of-focus edges and corners, 0...1. */
+  edgeBlur: number
+}
+
+/** How much each shot can differ from the last, like a fixed-exposure camera. */
+export interface VariationSettings {
+  /** Largest exposure change in stops. */
+  exposure: number
+  /** Largest white balance change, in `temperature` units. */
+  temperature: number
+}
+
+export const noLens: LensSettings = { distortion: 0, chromaticAberration: 0, edgeBlur: 0 }
+export const noVariation: VariationSettings = { exposure: 0, temperature: 0 }
 
 /** A film, digital camera or disposable camera look, decoded from `presets.json`. */
 export interface FilmPreset {
@@ -133,13 +180,18 @@ export interface FilmPreset {
   color: ColorSettings
   grain?: GrainSettings
   halation?: HalationSettings
+  bloom?: BloomSettings
   /** Soft glow from a cheap plastic lens, 0...1. */
   softness: number
+  lens: LensSettings
   /** On-camera flash: brighter center that falls off quickly, 0...1. */
   flash: number
+  /** RGB color of the flash, white unless it has a colored filter. */
+  flashColor: Vec3
   /** Edge darkening, 0...1. */
   vignette: number
   lightLeak?: LightLeakSettings
+  variation: VariationSettings
   /** Orange date imprint in the bottom-right corner. */
   dateStamp: boolean
 }

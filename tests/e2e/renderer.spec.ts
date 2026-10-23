@@ -115,6 +115,91 @@ test('the date stamp is drawn in the bottom-right corner', async ({ page }) => {
   expect(outside).toBe(0)
 })
 
+/** Standard deviation of the green channel in a region, given in top-left-origin pixels. */
+function spread(out: Rendered, x0: number, y0: number, x1: number, y1: number) {
+  const values: number[] = []
+  for (let y = y0; y < y1; y++) {
+    for (let x = x0; x < x1; x++) values.push(out.pixels[(y * out.width + x) * 4 + 1]!)
+  }
+  const mean = values.reduce((a, b) => a + b, 0) / values.length
+  return Math.sqrt(values.reduce((a, b) => a + (b - mean) ** 2, 0) / values.length)
+}
+
+test('grain can fade out in the highlights', async ({ page }) => {
+  // Big enough grain that small test images get it at full strength.
+  const grain = { intensity: 0.6, size: 5, response: [1, 1, 0] }
+  const preset = { id: 'g', name: 'G', category: 'film', grain }
+  const mid = await render(page, { preset, solid: '#777777', width: 400, height: 300 })
+  const bright = await render(page, { preset, solid: '#f4f4f4', width: 400, height: 300 })
+  expect(spread(mid, 0, 0, 400, 300)).toBeGreaterThan(2)
+  expect(spread(bright, 0, 0, 400, 300)).toBeLessThan(spread(mid, 0, 0, 400, 300) / 3)
+})
+
+test('color grain stays gray in black and white', async ({ page }) => {
+  const out = await render(page, {
+    preset: {
+      id: 'm',
+      name: 'M',
+      category: 'film',
+      color: { monochrome: true },
+      grain: { intensity: 0.8, chroma: 1, roughness: 1 },
+    },
+  })
+  let maxSpread = 0
+  for (let i = 0; i < out.pixels.length; i += 4) {
+    const [r, g, b] = [out.pixels[i]!, out.pixels[i + 1]!, out.pixels[i + 2]!]
+    maxSpread = Math.max(maxSpread, Math.max(r, g, b) - Math.min(r, g, b))
+  }
+  expect(maxSpread).toBeLessThanOrEqual(3)
+})
+
+test('lens distortion and fringing leave the center alone', async ({ page }) => {
+  const lens = { distortion: 1, chromaticAberration: 1 }
+  for (const distortion of [1, -1]) {
+    const out = await render(page, {
+      preset: { id: 'l', name: 'L', category: 'film', lens: { ...lens, distortion } },
+    })
+    const center = ((out.height / 2) * out.width + out.width / 2) * 4
+    for (let c = 0; c < 3; c++) {
+      expect(Math.abs(out.pixels[center + c]! - out.original[center + c]!)).toBeLessThanOrEqual(3)
+    }
+    expect(meanDifference(out.pixels, out.original), `${distortion}`).toBeGreaterThan(1)
+  }
+})
+
+test('light leaks follow the seed', async ({ page }) => {
+  const preset = {
+    id: 'leak',
+    name: 'Leak',
+    category: 'disposable',
+    lightLeak: { intensity: 0.8 },
+    variation: { exposure: 0.3, temperature: 0.3 },
+  }
+  const a = await render(page, { preset, seed: '5', solid: '#202020' })
+  const b = await render(page, { preset, seed: '5', solid: '#202020' })
+  const c = await render(page, { preset, seed: '6', solid: '#202020' })
+  expect(maxDifference(a.pixels, b.pixels)).toBe(0)
+  expect(meanDifference(a.pixels, c.pixels)).toBeGreaterThan(1)
+  // A leak on a dark image is warm: red clearly above blue somewhere.
+  let warm = 0
+  for (let i = 0; i < a.pixels.length; i += 4) if (a.pixels[i]! > a.pixels[i + 2]! + 40) warm++
+  expect(warm).toBeGreaterThan(100)
+})
+
+test('halation, bloom and edge blur render', async ({ page }) => {
+  const out = await render(page, {
+    preset: {
+      id: 'glow',
+      name: 'Glow',
+      category: 'film',
+      halation: { intensity: 1 },
+      bloom: { intensity: 1 },
+      lens: { edgeBlur: 1 },
+    },
+  })
+  expect(meanDifference(out.pixels, out.original)).toBeGreaterThan(1)
+})
+
 test('photos are encoded as JPEG at full size', async ({ page }) => {
   const out = await page.evaluate(() =>
     window.harness.encode({ preset: 'gold-200', width: 1200, height: 900 }),

@@ -6,12 +6,17 @@ import {
   type ColorSettings,
   type FilmCurve,
   type FilmPreset,
+  type GrainSettings,
   type HueBandName,
   type HueBands,
+  type LensSettings,
   type Mat3,
   type PresetCategory,
   type RGBCurves,
+  type VariationSettings,
   type Vec3,
+  noLens,
+  noVariation,
 } from './types'
 
 export class PresetDecodeError extends Error {}
@@ -148,6 +153,36 @@ function decodeColor(value: unknown, path: string): ColorSettings {
   return settings
 }
 
+function decodeGrain(value: unknown, path: string): GrainSettings {
+  const g = object(value, path)
+  return {
+    intensity: number(g, 'intensity', path),
+    size: number(g, 'size', path, 1),
+    chroma: number(g, 'chroma', path, 0),
+    roughness: number(g, 'roughness', path, 0),
+    response: vec3(g, 'response', path, [1, 1, 1]),
+  }
+}
+
+function decodeLens(value: unknown, path: string): LensSettings {
+  if (value === undefined) return noLens
+  const l = object(value, path)
+  return {
+    distortion: number(l, 'distortion', path, 0),
+    chromaticAberration: number(l, 'chromaticAberration', path, 0),
+    edgeBlur: number(l, 'edgeBlur', path, 0),
+  }
+}
+
+function decodeVariation(value: unknown, path: string): VariationSettings {
+  if (value === undefined) return noVariation
+  const v = object(value, path)
+  return {
+    exposure: number(v, 'exposure', path, 0),
+    temperature: number(v, 'temperature', path, 0),
+  }
+}
+
 const categories: readonly PresetCategory[] = ['film', 'digital', 'disposable']
 
 /** Decodes one preset. Every field except `id`, `name` and `category` defaults to "no change". */
@@ -163,30 +198,42 @@ export function decodePreset(value: unknown, path = 'preset'): FilmPreset {
     category: category as PresetCategory,
     color: decodeColor(p.color, `${path}.color`),
     softness: number(p, 'softness', path, 0),
+    lens: decodeLens(p.lens, `${path}.lens`),
     flash: number(p, 'flash', path, 0),
+    flashColor: vec3(p, 'flashColor', path, [1, 1, 1]),
     vignette: number(p, 'vignette', path, 0),
+    variation: decodeVariation(p.variation, `${path}.variation`),
     dateStamp: boolean(p, 'dateStamp', path, false),
   }
   if (p.inspiredBy !== undefined) preset.inspiredBy = string(p, 'inspiredBy', path)
-  if (p.grain !== undefined) {
-    const g = object(p.grain, `${path}.grain`)
-    preset.grain = {
-      intensity: number(g, 'intensity', `${path}.grain`),
-      size: number(g, 'size', `${path}.grain`, 1),
-    }
-  }
+  if (p.grain !== undefined) preset.grain = decodeGrain(p.grain, `${path}.grain`)
   if (p.halation !== undefined) {
     const h = object(p.halation, `${path}.halation`)
+    const hp = `${path}.halation`
     preset.halation = {
-      intensity: number(h, 'intensity', `${path}.halation`),
-      radius: number(h, 'radius', `${path}.halation`, 1),
+      intensity: number(h, 'intensity', hp),
+      radius: number(h, 'radius', hp, 1),
+      color: vec3(h, 'color', hp, [1, 0.25, 0.08]),
+      threshold: number(h, 'threshold', hp, 0.7),
+    }
+  }
+  if (p.bloom !== undefined) {
+    const b = object(p.bloom, `${path}.bloom`)
+    const bp = `${path}.bloom`
+    preset.bloom = {
+      intensity: number(b, 'intensity', bp),
+      radius: number(b, 'radius', bp, 1),
+      threshold: number(b, 'threshold', bp, 0.6),
     }
   }
   if (p.lightLeak !== undefined) {
     const l = object(p.lightLeak, `${path}.lightLeak`)
+    const lp = `${path}.lightLeak`
     preset.lightLeak = {
-      intensity: number(l, 'intensity', `${path}.lightLeak`),
-      color: vec3(l, 'color', `${path}.lightLeak`, [1.0, 0.45, 0.15]),
+      intensity: number(l, 'intensity', lp),
+      color: vec3(l, 'color', lp, [1.0, 0.45, 0.15]),
+      edgeColor: vec3(l, 'edgeColor', lp, [1.0, 0.75, 0.3]),
+      chance: number(l, 'chance', lp, 1),
     }
   }
   return preset

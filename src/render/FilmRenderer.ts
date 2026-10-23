@@ -9,6 +9,7 @@ import { SplitMix64 } from './splitmix64'
 import {
   blurShader,
   copyShader,
+  edgeBlurShader,
   finishShader,
   glowShader,
   highlightShader,
@@ -32,13 +33,15 @@ interface Target {
   height: number
 }
 
-type ProgramName = 'source' | 'copy' | 'highlight' | 'blur' | 'glow' | 'light' | 'finish'
+type ProgramName =
+  'source' | 'copy' | 'highlight' | 'blur' | 'edgeBlur' | 'glow' | 'light' | 'finish'
 
 const fragmentShaders: Record<ProgramName, string> = {
   source: sourceShader,
   copy: copyShader,
   highlight: highlightShader,
   blur: blurShader,
+  edgeBlur: edgeBlurShader,
   glow: glowShader,
   light: lightShader,
   finish: finishShader,
@@ -146,31 +149,89 @@ export class FilmRenderer {
 
     const shortEdge = Math.min(width, height)
 
-    // 1. Crop, scale and color.
+    // 1. Crop, scale, lens, this shot's exposure, and color.
     const useLUT = !isIdentityColor(preset.color)
     let current = this.acquire(width, height)
     this.uploadSource(source)
+    const lens = preset.lens
+    const k = 0.25 * Math.min(Math.max(lens.distortion, -1), 1)
+    // Barrel distortion pulls the corners in, pincushion pushes the middle of the edges out;
+    // scale so the image still fills the frame.
+    const nearestEdge = Math.min(width, height) / Math.hypot(width, height)
+    const distortionScale = k >= 0 ? 1 + k : 1 + k * nearestEdge * nearestEdge
     this.run('source', current, {
       u_source: [0, this.sourceTexture!],
       u_crop: [crop.x, crop.y, crop.width, crop.height],
+      u_size: [width, height],
+      u_distortion: k,
+      u_distortionScale: distortionScale,
+      u_aberration: 0.012 * Math.min(Math.max(lens.chromaticAberration, 0), 1),
+      u_gain: shotGain(preset, options.seed),
       u_useLUT: useLUT,
       // Always bind the 3D sampler to its own unit: samplers of different types may not share one.
       u_lut: [1, useLUT ? this.lut(preset.color) : null, gl.TEXTURE_3D],
       u_lutSize: defaultLUTDimension,
     })
 
-    // 2. Halation: red-orange glow around bright highlights.
+    // 2. Edge blur: a lens that is soft away from the center.
+    if (lens.edgeBlur > 0) {
+      const amount = Math.min(lens.edgeBlur, 1)
+      const blurred = this.blur(current, shortEdge * (0.003 + 0.009 * amount))
+      const next = this.acquire(width, height)
+      this.run('edgeBlur', next, {
+        u_source: [0, current.texture],
+        u_blurred: [1, blurred.texture],
+        u_size: [width, height],
+        u_amount: Math.min(1, 0.5 + amount),
+      })
+      this.release(blurred)
+      this.release(current)
+      current = next
+    }
+
+    // 3. Halation: a red-orange glow around bright highlights, tight near them and wider
+    // further out, from light scattering back through the film base.
     if (preset.halation && preset.halation.intensity > 0) {
+      const h = preset.halation
+      const amount = Math.min(h.intensity, 1)
       const highlights = this.acquire(width, height)
-      this.run('highlight', highlights, { u_source: [0, current.texture] })
-      const glow = this.blur(highlights, shortEdge * 0.015 * preset.halation.radius)
+      this.run('highlight', highlights, {
+        u_source: [0, current.texture],
+        u_threshold: h.threshold,
+      })
+      const tight = this.blur(highlights, shortEdge * 0.008 * h.radius)
       this.release(highlights)
-      const k = Math.min(preset.halation.intensity, 1)
-      current = this.glow(current, glow, [k, 0.25 * k, 0.08 * k])
+      current = this.glow(
+        current,
+        tight,
+        h.color.map((c) => 0.7 * c * amount),
+      )
+      const wide = this.blur(tight, shortEdge * 0.02 * h.radius)
+      this.release(tight)
+      current = this.glow(
+        current,
+        wide,
+        h.color.map((c) => 0.6 * c * amount),
+      )
+      this.release(wide)
+    }
+
+    // 4. Bloom: a soft white glow around bright areas.
+    if (preset.bloom && preset.bloom.intensity > 0) {
+      const b = preset.bloom
+      const highlights = this.acquire(width, height)
+      this.run('highlight', highlights, {
+        u_source: [0, current.texture],
+        u_threshold: b.threshold,
+      })
+      const glow = this.blur(highlights, shortEdge * 0.035 * b.radius)
+      this.release(highlights)
+      const amount = 0.8 * Math.min(b.intensity, 1)
+      current = this.glow(current, glow, [amount, amount, amount])
       this.release(glow)
     }
 
-    // 3. Softness: the glow of a cheap plastic lens.
+    // 5. Softness: the glow of a cheap plastic lens.
     if (preset.softness > 0) {
       const glow = this.blur(current, shortEdge * 0.02)
       const k = 0.8 * Math.min(preset.softness, 1)
@@ -178,28 +239,18 @@ export class FilmRenderer {
       this.release(glow)
     }
 
-    // 4–6. Flash, vignette and light leak.
+    // 6. Flash, vignette and light leak.
     const leak = preset.lightLeak && preset.lightLeak.intensity > 0 ? preset.lightLeak : undefined
-    if (preset.flash > 0 || preset.vignette > 0 || leak) {
-      let leakUniforms = {}
-      if (leak) {
-        const rng = new SplitMix64(options.seed ^ 0x4c45414bn)
-        const fromLeft = rng.nextBool()
-        const y = height * rng.nextDouble(0.2, 0.8)
-        const k = Math.min(leak.intensity, 1)
-        leakUniforms = {
-          u_leakCenter: [fromLeft ? 0 : width, y],
-          u_leakRadius: shortEdge * 0.9,
-          u_leakColor: leak.color.map((c) => c * k),
-        }
-      }
+    const leakUniforms = leak ? lightLeakUniforms(leak, options.seed, width, height) : undefined
+    if (preset.flash > 0 || preset.vignette > 0 || leakUniforms) {
       const next = this.acquire(width, height)
       this.run('light', next, {
         u_source: [0, current.texture],
         u_size: [width, height],
         u_flash: Math.min(preset.flash, 1),
+        u_flashColor: [...preset.flashColor],
         u_vignette: Math.min(preset.vignette, 1),
-        u_leak: !!leak,
+        u_leak: !!leakUniforms,
         ...leakUniforms,
       })
       this.release(current)
@@ -214,7 +265,11 @@ export class FilmRenderer {
       u_stamp: false,
     }
     if (preset.grain && preset.grain.intensity > 0) {
-      const scale = Math.max(1, (shortEdge / 1500) * preset.grain.size)
+      const g = preset.grain
+      // Grain is sized relative to the image. When a grain is smaller than a pixel, as in the
+      // viewfinder, it is weaker instead, the way a full-size photo looks when shrunk to fit.
+      const relative = (shortEdge / 1500) * g.size
+      const scale = Math.max(1, relative)
       // Each seed starts the tile at a different spot.
       const rng = new SplitMix64(options.seed)
       const offsetX = rng.nextInt(grainTileSize) * scale
@@ -224,7 +279,10 @@ export class FilmRenderer {
         u_noise: [1, this.noise()],
         u_noiseOffset: [offsetX, offsetY],
         u_noiseScale: scale,
-        u_grainAmount: Math.min(preset.grain.intensity, 1) * 1.5,
+        u_grainAmount: Math.min(g.intensity, 1) * 1.5 * Math.min(1, relative),
+        u_grainChroma: preset.color.monochrome ? 0 : Math.min(Math.max(g.chroma, 0), 1),
+        u_grainRoughness: Math.min(Math.max(g.roughness, 0), 1),
+        u_grainResponse: [...g.response],
       })
     }
     if (preset.dateStamp) {
@@ -428,15 +486,15 @@ export class FilmRenderer {
     if (!this.noiseTexture) {
       this.noiseTexture = this.createTexture(gl.TEXTURE_2D, gl.REPEAT)
       gl.pixelStorei(gl.UNPACK_ALIGNMENT, 1)
-      // Plain R8, no color space: the values are used as-is, so mid-gray stays exactly neutral.
+      // Plain RGB8, no color space: the values are used as-is, so mid-gray stays exactly neutral.
       gl.texImage2D(
         gl.TEXTURE_2D,
         0,
-        gl.R8,
+        gl.RGB8,
         grainTileSize,
         grainTileSize,
         0,
-        gl.RED,
+        gl.RGB,
         gl.UNSIGNED_BYTE,
         grainTile(),
       )
@@ -526,6 +584,52 @@ export class FilmRenderer {
     this.noiseTexture = null
     this.stampTexture = null
     this.stampKey = ''
+  }
+}
+
+/** This shot's exposure and white balance change, as a linear gain per channel. */
+function shotGain(preset: FilmPreset, seed: bigint): number[] {
+  const { exposure, temperature } = preset.variation
+  if (exposure === 0 && temperature === 0) return [1, 1, 1]
+  const rng = new SplitMix64(seed ^ 0x56415259n)
+  const stops = rng.nextDouble(-exposure, exposure)
+  const warmth = rng.nextDouble(-temperature, temperature)
+  const gain = Math.pow(2, stops)
+  return [gain * (1 + 0.12 * warmth), gain, gain * (1 - 0.12 * warmth)]
+}
+
+/** One to three seeded glowing blobs along the left or right edge. */
+function lightLeakUniforms(
+  leak: NonNullable<FilmPreset['lightLeak']>,
+  seed: bigint,
+  width: number,
+  height: number,
+): Uniforms | undefined {
+  const rng = new SplitMix64(seed ^ 0x4c45414bn)
+  if (rng.nextDouble() >= leak.chance) return undefined
+  const shortEdge = Math.min(width, height)
+  const fromLeft = rng.nextBool()
+  const count = 1 + rng.nextInt(3)
+  const k = Math.min(leak.intensity, 1)
+  const blobs: number[][] = []
+  const strengths: number[] = []
+  for (let i = 0; i < 3; i++) {
+    const inset = shortEdge * rng.nextDouble(-0.15, 0.1)
+    const x = fromLeft ? inset : width - inset
+    const y = height * rng.nextDouble(0.1, 0.9)
+    // Leaks come in through the film's edge, so they are longer along it than across.
+    const across = shortEdge * rng.nextDouble(0.25, 0.6)
+    const along = shortEdge * rng.nextDouble(0.4, 1.1)
+    blobs.push([x, y, across, along])
+    strengths.push(i < count ? k * rng.nextDouble(0.6, 1.2) : 0)
+  }
+  return {
+    u_leak0: blobs[0]!,
+    u_leak1: blobs[1]!,
+    u_leak2: blobs[2]!,
+    u_leakStrength: strengths,
+    u_leakColor: [...leak.color],
+    u_leakEdgeColor: [...leak.edgeColor],
   }
 }
 
