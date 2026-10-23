@@ -91,6 +91,40 @@ describe('PresetLibrary', () => {
     expect(() => PresetLibrary.decode(file)).toThrow(/increase/)
   })
 
+  it('decodes film color stages with defaults', () => {
+    const library = PresetLibrary.decode({
+      presets: [
+        {
+          id: 'x',
+          name: 'X',
+          category: 'film',
+          color: {
+            filmCurve: { contrast: 1.2 },
+            hue: { yellow: { lum: 0.3 } },
+            matrix: [1, 0, 0, 0, 1, 0, 0, 0, 1],
+          },
+        },
+      ],
+    })
+    const color = library.presets[0]!.color
+    expect(color.filmCurve).toEqual({
+      contrast: 1.2,
+      toe: 0.5,
+      shoulder: 0.5,
+      channelContrast: [1, 1, 1],
+    })
+    expect(color.hue).toEqual({ yellow: { hue: 0, sat: 0, lum: 0.3 } })
+    expect(color.matrix).toHaveLength(9)
+  })
+
+  it('rejects an unknown hue band and a short matrix', () => {
+    const preset = (color: unknown) => ({
+      presets: [{ id: 'x', name: 'X', category: 'film', color }],
+    })
+    expect(() => PresetLibrary.decode(preset({ hue: { teal: { hue: 10 } } }))).toThrow(/hue band/)
+    expect(() => PresetLibrary.decode(preset({ matrix: [1, 0, 0] }))).toThrow(/nine/)
+  })
+
   it('rejects an unknown category and a missing name', () => {
     expect(() =>
       PresetLibrary.decode({ presets: [{ id: 'x', name: 'X', category: 'toy' }] }),

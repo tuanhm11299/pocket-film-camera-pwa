@@ -17,6 +17,50 @@ export interface RGBCurves {
   blue?: ToneCurve
 }
 
+/** A 3×3 matrix, row by row: output red is `m[0]*r + m[1]*g + m[2]*b`, and so on. */
+export type Mat3 = readonly [number, number, number, number, number, number, number, number, number]
+
+/**
+ * A film characteristic curve: an S-curve around mid-gray with a separate toe (shadows) and
+ * shoulder (highlights). Different contrast per channel gives film's color crossover,
+ * e.g. blue shadows with warm highlights.
+ */
+export interface FilmCurve {
+  /** Midtone contrast; 1 keeps the slope through mid-gray. */
+  contrast: number
+  /** 0 (hard, digital-like) ... 1 (long, soft toe that holds shadow detail). */
+  toe: number
+  /** 0 (hard, digital-like) ... 1 (long, soft shoulder that holds highlight detail). */
+  shoulder: number
+  /** Multiplies `contrast` per channel. */
+  channelContrast: Vec3
+}
+
+export const hueBandNames = [
+  'red',
+  'orange',
+  'yellow',
+  'green',
+  'aqua',
+  'blue',
+  'purple',
+  'magenta',
+] as const
+
+export type HueBandName = (typeof hueBandNames)[number]
+
+/** Changes to the colors near one hue. Neutrals are never affected. */
+export interface HueBand {
+  /** Hue shift in degrees, roughly -60...60. */
+  hue: number
+  /** -1 (gray) ... 1 (twice as saturated). */
+  sat: number
+  /** -1 (darker) ... 1 (lighter). */
+  lum: number
+}
+
+export type HueBands = Partial<Record<HueBandName, HueBand>>
+
 /** Color and tone adjustments. These are baked into a single 3D LUT per preset. */
 export interface ColorSettings {
   /** Exposure change in stops. */
@@ -25,6 +69,10 @@ export interface ColorSettings {
   contrast: number
   /** 1 leaves color unchanged, 0 is grayscale. */
   saturation: number
+  /** Saturation multiplier in the shadows, so film can lose color in the dark tones. */
+  shadowSaturation: number
+  /** Saturation multiplier in the highlights. */
+  highlightSaturation: number
   /** -1 (cool) ... 1 (warm). */
   temperature: number
   /** -1 (green) ... 1 (magenta). */
@@ -33,6 +81,17 @@ export interface ColorSettings {
   fade: number
   /** Compresses highlights softly instead of clipping them, 0...1. */
   highlightRolloff: number
+  /**
+   * Makes highlights clip like a small digital sensor, 0...1: once one channel is nearly
+   * full, the color bleaches to white.
+   */
+  clip: number
+  /** Channel mixing in linear light, e.g. dye cross-talk or infrared color swaps. */
+  matrix?: Mat3
+  /** Replaces `contrast` with a film characteristic curve. */
+  filmCurve?: FilmCurve
+  /** Hue-selective changes, e.g. lighter yellows or cyan-leaning blues. */
+  hue: HueBands
   monochrome: boolean
   /** Channel weights for black and white conversion. */
   monoMix: Vec3
@@ -90,10 +149,14 @@ export function defaultColorSettings(): ColorSettings {
     exposure: 0,
     contrast: 0,
     saturation: 1,
+    shadowSaturation: 1,
+    highlightSaturation: 1,
     temperature: 0,
     tint: 0,
     fade: 0,
     highlightRolloff: 0,
+    clip: 0,
+    hue: {},
     monochrome: false,
     monoMix: [0.2126, 0.7152, 0.0722],
     shadowTint: [0, 0, 0],
@@ -109,10 +172,16 @@ export function isIdentityColor(c: ColorSettings): boolean {
     c.exposure === d.exposure &&
     c.contrast === d.contrast &&
     c.saturation === d.saturation &&
+    c.shadowSaturation === d.shadowSaturation &&
+    c.highlightSaturation === d.highlightSaturation &&
     c.temperature === d.temperature &&
     c.tint === d.tint &&
     c.fade === d.fade &&
     c.highlightRolloff === d.highlightRolloff &&
+    c.clip === d.clip &&
+    !c.matrix &&
+    !c.filmCurve &&
+    Object.keys(c.hue).length === 0 &&
     c.monochrome === d.monochrome &&
     sameVec(c.monoMix, d.monoMix) &&
     sameVec(c.shadowTint, d.shadowTint) &&

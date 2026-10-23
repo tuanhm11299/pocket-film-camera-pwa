@@ -2,8 +2,13 @@ import presetsFile from './presets.json'
 import { ToneCurve } from '@/render/toneCurve'
 import {
   defaultColorSettings,
+  hueBandNames,
   type ColorSettings,
+  type FilmCurve,
   type FilmPreset,
+  type HueBandName,
+  type HueBands,
+  type Mat3,
   type PresetCategory,
   type RGBCurves,
   type Vec3,
@@ -55,6 +60,44 @@ function vec3(obj: Json, key: string, path: string, fallback: Vec3): Vec3 {
   return [x, y, z]
 }
 
+function matrix(obj: Json, key: string, path: string): Mat3 | undefined {
+  const value = obj[key]
+  if (value === undefined) return undefined
+  if (!Array.isArray(value) || value.length !== 9 || !value.every((v) => Number.isFinite(v))) {
+    fail(`${path}.${key}`, 'expected nine numbers')
+  }
+  return [...value] as unknown as Mat3
+}
+
+function filmCurve(obj: Json, key: string, path: string): FilmCurve | undefined {
+  if (obj[key] === undefined) return undefined
+  const f = object(obj[key], `${path}.${key}`)
+  const p = `${path}.${key}`
+  return {
+    contrast: number(f, 'contrast', p, 1),
+    toe: number(f, 'toe', p, 0.5),
+    shoulder: number(f, 'shoulder', p, 0.5),
+    channelContrast: vec3(f, 'channelContrast', p, [1, 1, 1]),
+  }
+}
+
+function hueBands(obj: Json, key: string, path: string): HueBands {
+  if (obj[key] === undefined) return {}
+  const raw = object(obj[key], `${path}.${key}`)
+  const bands: HueBands = {}
+  for (const [name, value] of Object.entries(raw)) {
+    const p = `${path}.${key}.${name}`
+    if (!hueBandNames.includes(name as HueBandName)) fail(p, 'unknown hue band')
+    const b = object(value, p)
+    bands[name as HueBandName] = {
+      hue: number(b, 'hue', p, 0),
+      sat: number(b, 'sat', p, 0),
+      lum: number(b, 'lum', p, 0),
+    }
+  }
+  return bands
+}
+
 function curve(obj: Json, key: string, path: string): ToneCurve | undefined {
   const value = obj[key]
   if (value === undefined) return undefined
@@ -80,20 +123,29 @@ function decodeColor(value: unknown, path: string): ColorSettings {
     }
     curves = Object.fromEntries(Object.entries(curves).filter(([, v]) => v !== undefined))
   }
-  return {
+  const settings: ColorSettings = {
     exposure: number(c, 'exposure', path, defaults.exposure),
     contrast: number(c, 'contrast', path, defaults.contrast),
     saturation: number(c, 'saturation', path, defaults.saturation),
+    shadowSaturation: number(c, 'shadowSaturation', path, defaults.shadowSaturation),
+    highlightSaturation: number(c, 'highlightSaturation', path, defaults.highlightSaturation),
     temperature: number(c, 'temperature', path, defaults.temperature),
     tint: number(c, 'tint', path, defaults.tint),
     fade: number(c, 'fade', path, defaults.fade),
     highlightRolloff: number(c, 'highlightRolloff', path, defaults.highlightRolloff),
+    clip: number(c, 'clip', path, defaults.clip),
+    hue: hueBands(c, 'hue', path),
     monochrome: boolean(c, 'monochrome', path, defaults.monochrome),
     monoMix: vec3(c, 'monoMix', path, defaults.monoMix),
     shadowTint: vec3(c, 'shadowTint', path, defaults.shadowTint),
     highlightTint: vec3(c, 'highlightTint', path, defaults.highlightTint),
     curves,
   }
+  const m = matrix(c, 'matrix', path)
+  if (m) settings.matrix = m
+  const f = filmCurve(c, 'filmCurve', path)
+  if (f) settings.filmCurve = f
+  return settings
 }
 
 const categories: readonly PresetCategory[] = ['film', 'digital', 'disposable']
