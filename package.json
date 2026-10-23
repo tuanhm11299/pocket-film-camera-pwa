@@ -15,7 +15,8 @@
     "format:check": "prettier --check .",
     "test": "vitest run",
     "test:watch": "vitest",
-    "test:e2e": "playwright test"
+    "test:e2e": "playwright test",
+    "docs:looks": "node scripts/look-samples.mjs"
   },
   "dependencies": {
     "exifr": "^7.1.3",

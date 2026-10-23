@@ -74,6 +74,9 @@ For another host, set the base path when building, for example `BASE_PATH=/ npm 
 
 ## Cameras
 
+See [docs/LOOKS.md](docs/LOOKS.md) for every look with a sample, how the viewfinder and
+saved photos are rendered, and the references behind them.
+
 Looks are organized like the cameras in Dazz Cam: pick a category (Digital, 135, 120,
 Instant, Disposable), then a camera. A camera can have several color profiles, like films
 loaded into it, and options such as a frame, a light leak, the date stamp or gate weave

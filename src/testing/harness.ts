@@ -4,6 +4,7 @@ import type { FilmPreset } from '@/presets/types'
 import { encodePhoto } from '@/render/encode'
 import { FilmRenderer } from '@/render/FilmRenderer'
 import { framedAspect } from '@/render/geometry'
+import { ToneCurve } from '@/render/toneCurve'
 import { drawTestScene, solidImage } from './testScene'
 
 let renderer: FilmRenderer | undefined
@@ -101,6 +102,27 @@ async function encode(request: RenderRequest) {
   return { type: photo.blob.type, width: bitmap.width, height: bitmap.height }
 }
 
+/**
+ * Renders one look at its own shape, frame included, as large as fits in a `width`×`height`
+ * box, on a test scene drawn at the picture's shape. Leaves the result in the canvas.
+ */
+function renderSample(preset: FilmPreset, boxWidth: number, boxHeight: number) {
+  const shape = preset.aspect ?? [3, 4]
+  const aspect = framedAspect(shape, preset.frame)
+  const width = Math.round(aspect > boxWidth / boxHeight ? boxWidth : boxHeight * aspect)
+  const height = Math.round(width / aspect)
+  const sceneWidth = Math.round(Math.sqrt((boxWidth * boxWidth * shape[0]) / shape[1]))
+  const sceneHeight = Math.round((sceneWidth * shape[1]) / shape[0])
+  const scene = {
+    image: drawTestScene(sceneWidth, sceneHeight),
+    width: sceneWidth,
+    height: sceneHeight,
+  }
+  const r = getRenderer()
+  r.render(preset, scene, { seed: 7n, date: new Date('1998-10-12T12:00:00') }, width, height)
+  return { canvas: r.canvas, width, height }
+}
+
 /** Every look, or the ones given, on the test scene, labeled, as a PNG data URL. */
 function contactSheet(cell = 360, ids?: string[]) {
   const presets = ids ? ids.map((id) => resolvePreset(id)) : cameraLibrary.looks
@@ -113,25 +135,11 @@ function contactSheet(cell = 360, ids?: string[]) {
   const ctx = sheet.getContext('2d')!
   ctx.fillStyle = '#111'
   ctx.fillRect(0, 0, sheet.width, sheet.height)
-  const r = getRenderer()
   presets.forEach((preset, i) => {
-    // Each look at its own shape, frame included, as large as fits in its cell, on a scene
-    // drawn at the picture's shape.
-    const shape = preset.aspect ?? [3, 4]
-    const aspect = framedAspect(shape, preset.frame)
-    const width = Math.round(aspect > cell / box ? cell : box * aspect)
-    const height = Math.round(width / aspect)
-    const sceneWidth = Math.round(Math.sqrt((cell * cell * shape[0]) / shape[1]))
-    const sceneHeight = Math.round((sceneWidth * shape[1]) / shape[0])
-    const scene = {
-      image: drawTestScene(sceneWidth, sceneHeight),
-      width: sceneWidth,
-      height: sceneHeight,
-    }
-    r.render(preset, scene, { seed: 7n, date: new Date('1998-10-12T12:00:00') }, width, height)
+    const { canvas, width, height } = renderSample(preset, cell, box)
     const x = (i % columns) * cell
     const y = Math.floor(i / columns) * (box + label)
-    ctx.drawImage(r.canvas, x + (cell - width) / 2, y + (box - height) / 2)
+    ctx.drawImage(canvas, x + (cell - width) / 2, y + (box - height) / 2)
     ctx.fillStyle = '#fff'
     ctx.font = '15px sans-serif'
     ctx.fillText(preset.name, x + 8, y + box + 20)
@@ -139,11 +147,29 @@ function contactSheet(cell = 360, ids?: string[]) {
   return sheet.toDataURL('image/png')
 }
 
+/** One look on the test scene, at most `cell` pixels wide and 1.1 × `cell` tall, as JPEG. */
+function sample(id: string, cell = 360) {
+  const { canvas } = renderSample(resolvePreset(id), cell, Math.round(cell * 1.1))
+  return canvas.toDataURL('image/jpeg', 0.85)
+}
+
+/** Every camera with its decoded looks, as plain JSON, for generating documentation. */
+function catalog() {
+  return JSON.parse(
+    JSON.stringify(cameraLibrary.cameras, (_, value: unknown) =>
+      // Tone curves become their points again, as in cameras.json.
+      value instanceof ToneCurve ? value.points.map((p) => [p.x, p.y]) : value,
+    ),
+  ) as unknown
+}
+
 const harness = {
   render,
   time,
   encode,
   contactSheet,
+  sample,
+  catalog,
   presetIds: () => cameraLibrary.looks.map((p) => p.id),
   supported: () => FilmRenderer.isSupported(),
 }
