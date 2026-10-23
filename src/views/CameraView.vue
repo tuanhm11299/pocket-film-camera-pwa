@@ -1,13 +1,13 @@
 <script setup lang="ts">
-import { computed, ref, shallowRef, watch } from 'vue'
+import { computed, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import AppIcon from '@/components/AppIcon.vue'
 import PresetPicker from '@/components/PresetPicker.vue'
 import ShotReviewSheet from '@/components/ShotReviewSheet.vue'
 import { useCamera } from '@/composables/useCamera'
 import { useObjectURL } from '@/composables/useObjectURL'
-import { useStoredString } from '@/composables/usePreferences'
-import { defaultCameraPresetId, presetOrDefault } from '@/presets/library'
+import { useCameraSelection } from '@/composables/useCameraSelection'
+import { defaultCameraId } from '@/presets/library'
 import { pendingPhoto } from '@/photo/pendingPhoto'
 
 /**
@@ -15,13 +15,20 @@ import { pendingPhoto } from '@/photo/pendingPhoto'
  * library button that opens photos in the editor.
  */
 const router = useRouter()
-const presetId = useStoredString('pocket-film.camera-preset', defaultCameraPresetId)
-const preset = shallowRef(presetOrDefault(presetId.value, defaultCameraPresetId))
-watch(preset, (p) => (presetId.value = p.id))
+const {
+  camera: selectedCamera,
+  choice,
+  look,
+} = useCameraSelection('pocket-film.camera-preset', defaultCameraId)
 
 const canvas = ref<HTMLCanvasElement | null>(null)
-const camera = useCamera(canvas, preset)
+const camera = useCamera(canvas, look)
 const { status, flashMode, supportsFlash, facing, isCapturing, isBlinking, lastShot } = camera
+const viewfinderStyle = computed(() => {
+  const aspect = camera.viewfinderAspect.value
+  // As large as fits, at the photo's shape.
+  return { aspectRatio: `${aspect}`, width: `min(100cqw, ${aspect * 100}cqh)` }
+})
 
 const thumbnailURL = useObjectURL(computed(() => lastShot.value?.thumbnail))
 const reviewing = ref(false)
@@ -40,7 +47,7 @@ function onFilePicked(event: Event) {
   input.value = ''
   if (!file) return
   pendingPhoto.value = file
-  void router.push({ name: 'edit', query: { preset: preset.value.id } })
+  void router.push({ name: 'edit', query: { preset: look.value.id } })
 }
 </script>
 
@@ -75,7 +82,12 @@ function onFilePicked(event: Event) {
     </div>
 
     <div class="viewfinder-area">
-      <div class="viewfinder" :aria-label="`Viewfinder, ${preset.name}`" role="img">
+      <div
+        class="viewfinder"
+        :style="viewfinderStyle"
+        :aria-label="`Viewfinder, ${look.name}`"
+        role="img"
+      >
         <canvas ref="canvas" :class="{ hidden: status !== 'running' }" />
         <div v-if="status === 'unavailable'" class="message">
           <AppIcon name="camera" class="message-icon" />
@@ -98,7 +110,7 @@ function onFilePicked(event: Event) {
       </div>
     </div>
 
-    <PresetPicker v-model="preset" />
+    <PresetPicker v-model:camera="selectedCamera" v-model:choice="choice" />
 
     <div class="bottom-bar">
       <div class="side">
@@ -174,9 +186,6 @@ function onFilePicked(event: Event) {
 
 .viewfinder {
   position: relative;
-  /* As large as fits, at 3:4. */
-  width: min(100cqw, 75cqh);
-  aspect-ratio: 3 / 4;
   background: #000;
   border-radius: 4px;
   overflow: hidden;

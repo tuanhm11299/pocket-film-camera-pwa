@@ -167,7 +167,7 @@ export class ColorTransform {
   private clip(c: RGB): RGB {
     const amount = Math.min(this.settings.clip, 1)
     const max = Math.max(...c)
-    const knee = 1 - 0.45 * amount
+    const knee = 1 - 0.25 * amount
     const t = smoothstep(knee, 1, max) * amount
     return c.map((x) => Math.min(x + (max - x) * t, 1)) as RGB
   }

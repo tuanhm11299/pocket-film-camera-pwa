@@ -1,7 +1,7 @@
 import type { FilmPreset } from '@/presets/types'
 import { makeThumbnail } from '@/photo/thumbnail'
 import { FilmRenderer, type RenderSource } from './FilmRenderer'
-import { fitRenderSize, fullCrop, type CropRect } from './geometry'
+import { fitRenderSize, photoSize, pictureAspect } from './geometry'
 import type { RenderOptions } from './renderOptions'
 
 export const jpegQuality = 0.9
@@ -26,24 +26,25 @@ function renderer(): FilmRenderer {
 }
 
 /**
- * Renders a preset onto `crop` of the source at full resolution and encodes it as JPEG,
- * plus a small thumbnail. Very large photos are scaled down to what the browser's canvas
- * and GPU can hold. Calls run one at a time, since they share one canvas.
+ * Renders a preset onto the source at full resolution, cropped to the preset's shape and
+ * with its frame, and encodes it as JPEG, plus a small thumbnail. Very large photos are
+ * scaled down to what the browser's canvas and GPU can hold. Calls run one at a time, since
+ * they share one canvas.
+ *
+ * With `matchOrientation`, a landscape source gets the preset's shape turned sideways.
  */
 export function encodePhoto(
   preset: FilmPreset,
   source: RenderSource,
   options: RenderOptions,
-  crop: CropRect = fullCrop,
+  { matchOrientation = false } = {},
 ): Promise<EncodedPhoto> {
   const run = queue.then(async () => {
     const r = renderer()
-    const { width, height } = fitRenderSize(
-      source.width * crop.width,
-      source.height * crop.height,
-      r.maxTextureSize,
-    )
-    if (!r.render(preset, source, options, width, height, crop)) {
+    const aspect = pictureAspect(preset.aspect, source.width, source.height, matchOrientation)
+    const full = photoSize(aspect, preset.frame, source.width, source.height)
+    const { width, height } = fitRenderSize(full.width, full.height, r.maxTextureSize)
+    if (!r.render(preset, source, options, width, height)) {
       throw new Error('The photo could not be rendered.')
     }
     const thumbnail = await makeThumbnail(r.canvas, width, height)

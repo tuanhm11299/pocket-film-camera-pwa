@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { presetLibrary } from '@/presets/library'
+import { cameraLibrary } from '@/presets/library'
 import { defaultColorSettings, isIdentityColor, type ColorSettings } from '@/presets/types'
 import { ColorTransform, filmCurveValue, hueAndChroma } from '@/render/colorTransform'
 import { cubeData, defaultLUTDimension } from '@/render/lut'
@@ -41,8 +41,8 @@ describe('cubeData', () => {
     }
   })
 
-  it('stays in range for every preset', () => {
-    for (const preset of presetLibrary.presets) {
+  it('stays in range for every look', () => {
+    for (const preset of cameraLibrary.looks) {
       for (const value of cubeData(preset.color, 9)) {
         expect(value, preset.id).toBeGreaterThanOrEqual(0)
         expect(value, preset.id).toBeLessThanOrEqual(1)

@@ -1,9 +1,9 @@
-import { onBeforeUnmount, onMounted, ref, shallowRef, watch, type Ref } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref, shallowRef, watch, type Ref } from 'vue'
 import { addPhoto, latestPhoto, type GalleryPhoto } from '@/gallery/db'
 import type { FilmPreset } from '@/presets/types'
 import { encodePhoto } from '@/render/encode'
 import { FilmRenderer } from '@/render/FilmRenderer'
-import { aspectFillCrop } from '@/render/geometry'
+import { framedAspect } from '@/render/geometry'
 import { newRenderOptions, type RenderOptions } from '@/render/renderOptions'
 import {
   CameraDeniedError,
@@ -16,8 +16,8 @@ import { useAlert } from './useAlert'
 
 export type CameraStatus = 'unavailable' | 'starting' | 'denied' | 'running' | 'paused'
 
-/** The viewfinder and photos are 3:4 portrait, like the iOS app. */
-export const viewfinderAspect = 3 / 4
+/** Looks without a shape of their own shoot 3:4 portrait, like the iOS app. */
+export const defaultCameraAspect = [3, 4] as const
 
 const maxPixelRatio = 2
 
@@ -25,8 +25,13 @@ const maxPixelRatio = 2
  * The camera screen's state: stream, viewfinder, flash, capture and saving.
  * Draws the live, filtered viewfinder into `canvas`.
  */
-export function useCamera(canvas: Ref<HTMLCanvasElement | null>, preset: Ref<FilmPreset>) {
+export function useCamera(canvas: Ref<HTMLCanvasElement | null>, look: Ref<FilmPreset>) {
   const alerts = useAlert()
+  const preset = computed(() =>
+    look.value.aspect ? look.value : { ...look.value, aspect: defaultCameraAspect },
+  )
+  /** Width over height of the viewfinder and photos, frame included. */
+  const viewfinderAspect = computed(() => framedAspect(preset.value.aspect!, preset.value.frame))
   const status = ref<CameraStatus>('starting')
   const flashMode = ref<FlashMode>('off')
   const supportsFlash = ref(false)
@@ -107,14 +112,7 @@ export function useCamera(canvas: Ref<HTMLCanvasElement | null>, preset: Ref<Fil
         height: video.videoHeight,
         live: true,
       }
-      renderer.render(
-        preset.value,
-        source,
-        nextOptions,
-        width,
-        height,
-        aspectFillCrop(source.width, source.height, width, height),
-      )
+      renderer.render(preset.value, source, nextOptions, width, height)
     }
     scheduleFrame()
   }
@@ -150,8 +148,7 @@ export function useCamera(canvas: Ref<HTMLCanvasElement | null>, preset: Ref<Fil
       const frame = await service.capture(flashMode.value)
       // Ready for the next shot while this one is processed and saved.
       nextOptions = newRenderOptions()
-      const portraitCrop = aspectFillCrop(frame.width, frame.height, viewfinderAspect, 1)
-      encoded = await encodePhoto(shotPreset, frame, options, portraitCrop)
+      encoded = await encodePhoto(shotPreset, frame, options)
       if (frame.image instanceof ImageBitmap) frame.image.close()
     } catch {
       alerts.failed("The photo couldn't be taken.")
@@ -209,6 +206,7 @@ export function useCamera(canvas: Ref<HTMLCanvasElement | null>, preset: Ref<Fil
   })
 
   return {
+    viewfinderAspect,
     status,
     flashMode,
     supportsFlash,

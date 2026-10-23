@@ -4,6 +4,6 @@ playwright-report
 test-results
 contact-sheet
 package-lock.json
-src/presets/presets.json
+src/presets/cameras.json
 dist-test
 .playwright

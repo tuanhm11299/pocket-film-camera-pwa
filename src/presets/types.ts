@@ -2,11 +2,13 @@ import type { ToneCurve } from '@/render/toneCurve'
 
 export type Vec3 = readonly [number, number, number]
 
-export type PresetCategory = 'film' | 'digital' | 'disposable'
+export type PresetCategory = 'digital' | 'film135' | 'film120' | 'instant' | 'disposable'
 
 export const presetCategories: readonly { id: PresetCategory; title: string }[] = [
-  { id: 'film', title: 'Film' },
   { id: 'digital', title: 'Digital' },
+  { id: 'film135', title: '135' },
+  { id: 'film120', title: '120' },
+  { id: 'instant', title: 'Instant' },
   { id: 'disposable', title: 'Disposable' },
 ]
 
@@ -157,6 +159,8 @@ export interface LensSettings {
   chromaticAberration: number
   /** Out-of-focus edges and corners, 0...1. */
   edgeBlur: number
+  /** A slightly soft picture overall, like an instant print, 0...1. */
+  blur: number
 }
 
 /** How much each shot can differ from the last, like a fixed-exposure camera. */
@@ -167,7 +171,27 @@ export interface VariationSettings {
   temperature: number
 }
 
-export const noLens: LensSettings = { distortion: 0, chromaticAberration: 0, edgeBlur: 0 }
+export const frameStyles = [
+  'instax-mini',
+  'instax-square',
+  'instant-white',
+  'film-35',
+  'film-120',
+  'slide-mount',
+] as const
+
+export type FrameStyle = (typeof frameStyles)[number]
+
+/** A border drawn around the photo: an instant print, a film strip or a slide mount. */
+export interface FrameSettings {
+  style: FrameStyle
+  /** CSS color of the paper, film base or mount. */
+  color: string
+  /** Edge print on film frames, e.g. "PF 400". */
+  text: string
+}
+
+export const noLens: LensSettings = { distortion: 0, chromaticAberration: 0, edgeBlur: 0, blur: 0 }
 export const noVariation: VariationSettings = { exposure: 0, temperature: 0 }
 
 /** A film, digital camera or disposable camera look, decoded from `presets.json`. */
@@ -194,6 +218,74 @@ export interface FilmPreset {
   variation: VariationSettings
   /** Orange date imprint in the bottom-right corner. */
   dateStamp: boolean
+  /** CSS color of the date imprint. */
+  dateStampColor: string
+  /**
+   * Width and height of the picture, e.g. [2, 3] for a 35mm frame held upright. Without it,
+   * the camera shoots 3:4 and edited photos keep their shape.
+   */
+  aspect?: readonly [number, number]
+  frame?: FrameSettings
+  /** Film frames sit a little crooked and off-center, like a film strip in a scanner. */
+  jitter: boolean
+}
+
+/** Toggles a camera offers, with their default state. */
+export interface CameraOptions {
+  frame?: boolean
+  lightLeak?: boolean
+  dateStamp?: boolean
+  jitter?: boolean
+}
+
+export type CameraToggle = keyof CameraOptions
+
+export const cameraToggles: readonly { id: CameraToggle; title: string }[] = [
+  { id: 'frame', title: 'Frame' },
+  { id: 'lightLeak', title: 'Light Leak' },
+  { id: 'dateStamp', title: 'Date' },
+  { id: 'jitter', title: 'Jitter' },
+]
+
+export interface FrameColor {
+  name: string
+  /** CSS color. */
+  color: string
+}
+
+/** One color look of a camera, like a film loaded into it. */
+export interface CameraProfile {
+  id: string
+  name: string
+  /** The film or color profile this is modeled on. */
+  inspiredBy?: string
+  /** What the look is aiming for, to guide tuning. */
+  notes?: string
+  /** The complete look with every option on. */
+  look: FilmPreset
+}
+
+/** A camera from `cameras.json`: one or more profiles, a format and options. */
+export interface Camera {
+  id: string
+  name: string
+  inspiredBy?: string
+  category: PresetCategory
+  profiles: readonly CameraProfile[]
+  options: CameraOptions
+  /** Paper colors for instant frames; the first is the default. */
+  frameColors: readonly FrameColor[]
+}
+
+/** What the user picked for a camera. */
+export interface CameraChoice {
+  profile: string
+  frame: boolean
+  lightLeak: boolean
+  dateStamp: boolean
+  jitter: boolean
+  /** A `FrameColor` name. */
+  frameColor: string
 }
 
 export function defaultColorSettings(): ColorSettings {

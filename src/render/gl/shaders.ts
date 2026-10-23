@@ -123,27 +123,35 @@ void main() {
 }
 `
 
-/** Screen-blends a tinted glow over the image (halation and lens softness). */
+/** Screen-blends one or two tinted glows over the image (halation, bloom and lens softness). */
 export const glowShader = `${common}
 uniform sampler2D u_source;
 uniform sampler2D u_glow;
 uniform vec3 u_tint;
+uniform bool u_second;
+uniform sampler2D u_glow2;
+uniform vec3 u_tint2;
 void main() {
   vec3 base = texture(u_source, v_uv).rgb;
   vec3 glow = texture(u_glow, v_uv).rgb * u_tint;
+  if (u_second) glow = screen(glow, texture(u_glow2, v_uv).rgb * u_tint2);
   outColor = vec4(screen(base, glow), 1.0);
 }
 `
 
-/** Blends in a blurred copy toward the edges and corners, like a lens that is soft there. */
+/**
+ * Blends in a blurred copy, everywhere or more toward the edges and corners, like a lens that
+ * is soft there.
+ */
 export const edgeBlurShader = `${common}
 uniform sampler2D u_source;
 uniform sampler2D u_blurred;
 uniform vec2 u_size;
-uniform float u_amount;
+uniform float u_edgeAmount;
+uniform float u_overall;
 void main() {
   vec2 d = (v_uv - 0.5) * u_size / (0.5 * length(u_size));
-  float t = smoothstep(0.25, 1.0, length(d)) * u_amount;
+  float t = max(u_overall, smoothstep(0.25, 1.0, length(d)) * u_edgeAmount);
   outColor = vec4(mix(texture(u_source, v_uv).rgb, texture(u_blurred, v_uv).rgb, t), 1.0);
 }
 `
@@ -203,10 +211,14 @@ void main() {
 }
 `
 
-/** Grain and date stamp, then the output in sRGB. Draws to the canvas itself. */
+/**
+ * Grain and date stamp on the picture, then the frame around it, then the output in sRGB.
+ * Draws to the canvas itself.
+ */
 export const finishShader = `${common}
-uniform sampler2D u_source;
-uniform vec2 u_size;
+uniform sampler2D u_source; // the picture
+uniform vec2 u_size; // output size, frame included
+uniform vec4 u_picture; // the picture's rect in output pixels, origin at the bottom left
 uniform bool u_grain;
 uniform sampler2D u_noise;
 uniform vec2 u_noiseOffset;
@@ -217,7 +229,11 @@ uniform float u_grainRoughness;
 uniform vec3 u_grainResponse; // strength in the shadows, midtones and highlights
 uniform bool u_stamp;
 uniform sampler2D u_stampTexture;
-uniform vec4 u_stampRect; // x, y, width, height in output pixels, origin at the bottom left
+uniform vec4 u_stampRect; // x, y, width, height in picture pixels, origin at the bottom left
+uniform bool u_frame;
+uniform sampler2D u_frameTexture; // the frame at output size, transparent over the picture
+uniform vec3 u_frameBase; // the film base, around a frame that has moved
+uniform vec3 u_jitter; // x and y offset in pixels, and rotation in radians, of film and frame
 
 vec3 softLight(vec3 b, vec3 s) {
   vec3 d = mix(((16.0 * b - 12.0) * b + 4.0) * b, sqrt(b), step(0.25, b));
@@ -243,14 +259,34 @@ vec3 grain(vec3 c, vec2 p) {
 }
 
 void main() {
-  vec3 c = clamp(texture(u_source, v_uv).rgb, 0.0, 1.0);
   vec2 p = v_uv * u_size;
-  if (u_grain) c = grain(c, p);
-  if (u_stamp) {
-    vec2 q = (p - u_stampRect.xy) / u_stampRect.zw;
-    if (all(greaterThanEqual(q, vec2(0.0))) && all(lessThanEqual(q, vec2(1.0)))) {
-      vec4 s = texture(u_stampTexture, vec2(q.x, 1.0 - q.y));
-      c = mix(c, s.rgb, s.a);
+  // Where this pixel falls on the (possibly weaving) film.
+  vec2 center = 0.5 * u_size;
+  float cs = cos(u_jitter.z);
+  float sn = sin(u_jitter.z);
+  vec2 q = p - center - u_jitter.xy;
+  vec2 film = vec2(cs * q.x + sn * q.y, -sn * q.x + cs * q.y) + center;
+
+  vec2 local = film - u_picture.xy;
+  vec3 c = u_frameBase;
+  if (all(greaterThanEqual(local, vec2(0.0))) && all(lessThanEqual(local, u_picture.zw))) {
+    c = clamp(texture(u_source, local / u_picture.zw).rgb, 0.0, 1.0);
+    if (u_grain) c = grain(c, local);
+    if (u_stamp) {
+      vec2 s = (local - u_stampRect.xy) / u_stampRect.zw;
+      if (all(greaterThanEqual(s, vec2(0.0))) && all(lessThanEqual(s, vec2(1.0)))) {
+        vec4 stamp = texture(u_stampTexture, vec2(s.x, 1.0 - s.y));
+        c = mix(c, stamp.rgb, stamp.a);
+      }
+    }
+  }
+  if (u_frame) {
+    vec2 f = film / u_size;
+    if (all(greaterThanEqual(f, vec2(0.0))) && all(lessThanEqual(f, vec2(1.0)))) {
+      vec4 frame = texture(u_frameTexture, vec2(f.x, 1.0 - f.y));
+      c = mix(c, frame.rgb, frame.a);
+    } else {
+      c = u_frameBase;
     }
   }
   outColor = vec4(toSRGB(clamp(c, 0.0, 1.0)), 1.0);

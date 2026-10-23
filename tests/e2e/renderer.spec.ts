@@ -73,14 +73,14 @@ test('the Clean preset leaves pixels unchanged', async ({ page }) => {
 })
 
 test('color presets change the image', async ({ page }) => {
-  for (const preset of ['gold-200', 'muted-chrome', 'tungsten-800']) {
+  for (const preset of ['gold-200', 'muted-chrome', 'tungsten-800', 'infrared/ir400']) {
     const out = await render(page, { preset })
     expect(meanDifference(out.pixels, out.original), preset).toBeGreaterThan(2)
   }
 })
 
 test('monochrome presets have no color', async ({ page }) => {
-  for (const preset of ['mono-400', 'grit-400', 'bw-snap']) {
+  for (const preset of ['mono-400', 'grit-400', 'bw-snap', 'tlr-66/bw', 'pro-67/bw']) {
     const out = await render(page, { preset })
     let spread = 0
     for (let i = 0; i < out.pixels.length; i += 4) {
@@ -128,7 +128,7 @@ function spread(out: Rendered, x0: number, y0: number, x1: number, y1: number) {
 test('grain can fade out in the highlights', async ({ page }) => {
   // Big enough grain that small test images get it at full strength.
   const grain = { intensity: 0.6, size: 5, response: [1, 1, 0] }
-  const preset = { id: 'g', name: 'G', category: 'film', grain }
+  const preset = { id: 'g', name: 'G', category: 'film135', grain }
   const mid = await render(page, { preset, solid: '#777777', width: 400, height: 300 })
   const bright = await render(page, { preset, solid: '#f4f4f4', width: 400, height: 300 })
   expect(spread(mid, 0, 0, 400, 300)).toBeGreaterThan(2)
@@ -140,7 +140,7 @@ test('color grain stays gray in black and white', async ({ page }) => {
     preset: {
       id: 'm',
       name: 'M',
-      category: 'film',
+      category: 'film135',
       color: { monochrome: true },
       grain: { intensity: 0.8, chroma: 1, roughness: 1 },
     },
@@ -157,7 +157,7 @@ test('lens distortion and fringing leave the center alone', async ({ page }) => 
   const lens = { distortion: 1, chromaticAberration: 1 }
   for (const distortion of [1, -1]) {
     const out = await render(page, {
-      preset: { id: 'l', name: 'L', category: 'film', lens: { ...lens, distortion } },
+      preset: { id: 'l', name: 'L', category: 'film135', lens: { ...lens, distortion } },
     })
     const center = ((out.height / 2) * out.width + out.width / 2) * 4
     for (let c = 0; c < 3; c++) {
@@ -181,8 +181,7 @@ test('light leaks follow the seed', async ({ page }) => {
   expect(maxDifference(a.pixels, b.pixels)).toBe(0)
   expect(meanDifference(a.pixels, c.pixels)).toBeGreaterThan(1)
   // A leak on a dark image is warm: red clearly above blue somewhere.
-  let warm = 0
-  for (let i = 0; i < a.pixels.length; i += 4) if (a.pixels[i]! > a.pixels[i + 2]! + 40) warm++
+  const warm = a.pixels.filter((r, i) => i % 4 === 0 && r > a.pixels[i + 2]! + 40).length
   expect(warm).toBeGreaterThan(100)
 })
 
@@ -191,7 +190,7 @@ test('halation, bloom and edge blur render', async ({ page }) => {
     preset: {
       id: 'glow',
       name: 'Glow',
-      category: 'film',
+      category: 'film135',
       halation: { intensity: 1 },
       bloom: { intensity: 1 },
       lens: { edgeBlur: 1 },
@@ -200,9 +199,10 @@ test('halation, bloom and edge blur render', async ({ page }) => {
   expect(meanDifference(out.pixels, out.original)).toBeGreaterThan(1)
 })
 
-test('photos are encoded as JPEG at full size', async ({ page }) => {
-  const out = await page.evaluate(() =>
-    window.harness.encode({ preset: 'gold-200', width: 1200, height: 900 }),
-  )
-  expect(out).toEqual({ type: 'image/jpeg', width: 1200, height: 900 })
+test("photos are encoded as JPEG at full size, in the look's shape", async ({ page }) => {
+  const encode = (preset: string) =>
+    page.evaluate((p) => window.harness.encode({ preset: p, width: 1200, height: 900 }), preset)
+  expect(await encode('clean')).toEqual({ type: 'image/jpeg', width: 1200, height: 900 })
+  // 35mm film is 2:3; the camera holds it upright.
+  expect(await encode('gold-200')).toEqual({ type: 'image/jpeg', width: 600, height: 900 })
 })

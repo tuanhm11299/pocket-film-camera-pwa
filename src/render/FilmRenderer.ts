@@ -1,7 +1,9 @@
-import type { FilmPreset } from '@/presets/types'
+import type { FilmPreset, FrameSettings } from '@/presets/types'
 import { isIdentityColor } from '@/presets/types'
+import { srgbToLinear } from './colorTransform'
 import { drawDateStamp } from './dateStampImage'
-import { fullCrop, type CropRect } from './geometry'
+import { drawFrame } from './frameImage'
+import { aspectFillWithin, fullCrop, pictureRect, type CropRect, type Rect } from './geometry'
 import { grainTile, grainTileSize } from './grainTile'
 import { cachedCubeData, defaultLUTDimension } from './lut'
 import { dateStampText, type RenderOptions } from './renderOptions'
@@ -48,7 +50,7 @@ const fragmentShaders: Record<ProgramName, string> = {
 }
 
 /** Blurs are run at a lower resolution so that sigma stays at most this many texels. */
-const maxBlurSigma = 6
+const maxBlurSigma = 3
 
 export class RenderError extends Error {}
 
@@ -74,6 +76,8 @@ export class FilmRenderer {
   private stampTexture: WebGLTexture | null = null
   private stampKey = ''
   private stampSize = { width: 0, height: 0 }
+  private frameTex: WebGLTexture | null = null
+  private frameKey = ''
   private pool = new Map<string, Target[]>()
   private inUse: Target[] = []
   private poolSize = ''
@@ -121,23 +125,31 @@ export class FilmRenderer {
   }
 
   /**
-   * Renders `preset` onto `crop` of `source` and draws it into the canvas at `width`×`height`.
-   * Returns false when the context is lost and nothing was drawn.
+   * Renders `preset` onto `crop` of `source` and draws it into the canvas at
+   * `outputWidth`×`outputHeight`, including the preset's frame. The picture inside the frame
+   * covers the crop, centered. Returns false when the context is lost and nothing was drawn.
    */
   render(
     preset: FilmPreset,
     source: RenderSource,
     options: RenderOptions,
-    width: number,
-    height: number,
+    outputWidth: number,
+    outputHeight: number,
     crop: CropRect = fullCrop,
   ): boolean {
-    if (this.isContextLost || width < 1 || height < 1) return false
+    if (this.isContextLost || outputWidth < 1 || outputHeight < 1) return false
     const gl = this.gl
-    width = Math.round(width)
-    height = Math.round(height)
-    if (this.canvas.width !== width) this.canvas.width = width
-    if (this.canvas.height !== height) this.canvas.height = height
+    outputWidth = Math.round(outputWidth)
+    outputHeight = Math.round(outputHeight)
+    if (this.canvas.width !== outputWidth) this.canvas.width = outputWidth
+    if (this.canvas.height !== outputHeight) this.canvas.height = outputHeight
+    // Every effect works on the picture alone; the frame is added at the end.
+    const pictureShape = preset.aspect
+      ? preset.aspect[0] / preset.aspect[1]
+      : (source.width * crop.width) / (source.height * crop.height)
+    const picture = pictureRect(outputWidth, outputHeight, preset.frame, pictureShape)
+    const { width, height } = picture
+    crop = aspectFillWithin(crop, source.width, source.height, width, height)
     const sizeKey = `${width}x${height}`
     if (this.poolSize !== sizeKey) {
       this.clearPool()
@@ -173,16 +185,19 @@ export class FilmRenderer {
       u_lutSize: defaultLUTDimension,
     })
 
-    // 2. Edge blur: a lens that is soft away from the center.
-    if (lens.edgeBlur > 0) {
-      const amount = Math.min(lens.edgeBlur, 1)
-      const blurred = this.blur(current, shortEdge * (0.003 + 0.009 * amount))
+    // 2. Blur: a lens that is soft away from the center, or a soft print overall.
+    if (lens.edgeBlur > 0 || lens.blur > 0) {
+      const edge = Math.min(lens.edgeBlur, 1)
+      const overall = Math.min(lens.blur, 1)
+      const sigma = Math.max(0.003 + 0.009 * edge, 0.0015 + 0.003 * overall)
+      const blurred = this.blur(current, shortEdge * sigma)
       const next = this.acquire(width, height)
       this.run('edgeBlur', next, {
         u_source: [0, current.texture],
         u_blurred: [1, blurred.texture],
         u_size: [width, height],
-        u_amount: Math.min(1, 0.5 + amount),
+        u_edgeAmount: edge > 0 ? Math.min(1, 0.5 + edge) : 0,
+        u_overall: overall > 0 ? Math.min(1, 0.4 + 0.6 * overall) : 0,
       })
       this.release(blurred)
       this.release(current)
@@ -219,12 +234,12 @@ export class FilmRenderer {
     // 4. Bloom: a soft white glow around bright areas.
     if (preset.bloom && preset.bloom.intensity > 0) {
       const b = preset.bloom
-      const highlights = this.acquire(width, height)
+      const highlights = this.acquire(Math.ceil(width / 2), Math.ceil(height / 2))
       this.run('highlight', highlights, {
         u_source: [0, current.texture],
         u_threshold: b.threshold,
       })
-      const glow = this.blur(highlights, shortEdge * 0.035 * b.radius)
+      const glow = this.blur(highlights, shortEdge * 0.0175 * b.radius)
       this.release(highlights)
       const amount = 0.8 * Math.min(b.intensity, 1)
       current = this.glow(current, glow, [amount, amount, amount])
@@ -257,12 +272,16 @@ export class FilmRenderer {
       current = next
     }
 
-    // 7–8. Grain and date stamp, drawn straight into the canvas.
+    // 7–9. Grain, date stamp and frame, drawn straight into the canvas.
     const uniforms: Uniforms = {
       u_source: [0, current.texture],
-      u_size: [width, height],
+      u_size: [outputWidth, outputHeight],
+      // In the shader's coordinates, with the origin at the bottom left.
+      u_picture: [picture.x, outputHeight - picture.y - height, width, height],
       u_grain: false,
       u_stamp: false,
+      u_frame: false,
+      u_jitter: [0, 0, 0],
     }
     if (preset.grain && preset.grain.intensity > 0) {
       const g = preset.grain
@@ -287,11 +306,12 @@ export class FilmRenderer {
     }
     if (preset.dateStamp) {
       const fontSize = Math.max(shortEdge * 0.045, 8)
-      const stamp = this.stamp(dateStampText(options.date), fontSize)
+      const stamp = this.stamp(dateStampText(options.date), fontSize, preset.dateStampColor)
       const margin = shortEdge * 0.05
       Object.assign(uniforms, {
         u_stamp: true,
         u_stampTexture: [2, stamp],
+        // In picture pixels, origin at the bottom left.
         u_stampRect: [
           width - margin - this.stampSize.width,
           margin,
@@ -300,7 +320,27 @@ export class FilmRenderer {
         ],
       })
     }
-    this.run('finish', null, uniforms, width, height)
+    if (preset.frame) {
+      const rng = new SplitMix64(options.seed ^ 0x4652414dn)
+      const frameNumber = 1 + rng.nextInt(36)
+      Object.assign(uniforms, {
+        u_frame: true,
+        u_frameTexture: [
+          3,
+          this.frameTexture(preset.frame, outputWidth, outputHeight, picture, frameNumber),
+        ],
+        u_frameBase: cssColorToLinear(preset.frame.color),
+      })
+      if (preset.jitter) {
+        // Gate weave: the film sits a little off-center and crooked in the scanner.
+        uniforms.u_jitter = [
+          shortEdge * rng.nextDouble(-0.012, 0.012),
+          shortEdge * rng.nextDouble(-0.012, 0.012),
+          (rng.nextDouble(-0.4, 0.4) * Math.PI) / 180,
+        ]
+      }
+    }
+    this.run('finish', null, uniforms, outputWidth, outputHeight)
     this.release(current)
     this.releaseAll()
     return true
@@ -322,6 +362,7 @@ export class FilmRenderer {
 
   // MARK: - Passes
 
+  /** A Gaussian blur of `source`, possibly at a lower resolution. `sigma` is in its pixels. */
   private blur(source: Target, sigma: number): Target {
     // Halve the resolution until sigma is small enough for a short kernel.
     let current = source
@@ -356,9 +397,23 @@ export class FilmRenderer {
     return vertical
   }
 
-  private glow(base: Target, glow: Target, tint: number[]): Target {
+  private glow(
+    base: Target,
+    glow: Target,
+    tint: number[],
+    second?: Target,
+    secondTint?: number[],
+  ): Target {
     const next = this.acquire(base.width, base.height)
-    this.run('glow', next, { u_source: [0, base.texture], u_glow: [1, glow.texture], u_tint: tint })
+    this.run('glow', next, {
+      u_source: [0, base.texture],
+      u_glow: [1, glow.texture],
+      u_tint: tint,
+      u_second: !!second,
+      // Always bind the second sampler, even unused, so it never shares a unit with the first.
+      u_glow2: [2, (second ?? glow).texture],
+      u_tint2: secondTint ?? [0, 0, 0],
+    })
     this.release(base)
     return next
   }
@@ -503,12 +558,12 @@ export class FilmRenderer {
     return this.noiseTexture
   }
 
-  private stamp(text: string, fontSize: number): WebGLTexture {
+  private stamp(text: string, fontSize: number, color: string): WebGLTexture {
     const gl = this.gl
     if (!this.stampTexture) this.stampTexture = this.createTexture()
-    const key = `${text}@${fontSize.toFixed(2)}`
+    const key = `${text}@${fontSize.toFixed(2)}@${color}`
     if (this.stampKey !== key) {
-      const canvas = drawDateStamp(text, fontSize)
+      const canvas = drawDateStamp(text, fontSize, color)
       gl.bindTexture(gl.TEXTURE_2D, this.stampTexture)
       gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, false)
       gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, false)
@@ -517,6 +572,27 @@ export class FilmRenderer {
       this.stampSize = { width: canvas.width, height: canvas.height }
     }
     return this.stampTexture!
+  }
+
+  private frameTexture(
+    frame: FrameSettings,
+    width: number,
+    height: number,
+    picture: Rect,
+    frameNumber: number,
+  ): WebGLTexture {
+    const gl = this.gl
+    if (!this.frameTex) this.frameTex = this.createTexture()
+    const key = [frame.style, frame.color, frame.text, width, height, frameNumber].join('|')
+    if (this.frameKey !== key) {
+      const canvas = drawFrame(frame, width, height, picture, frameNumber)
+      gl.bindTexture(gl.TEXTURE_2D, this.frameTex)
+      gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, false)
+      gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, false)
+      gl.texImage2D(gl.TEXTURE_2D, 0, gl.SRGB8_ALPHA8, gl.RGBA, gl.UNSIGNED_BYTE, canvas)
+      this.frameKey = key
+    }
+    return this.frameTex!
   }
 
   private acquire(width: number, height: number): Target {
@@ -567,7 +643,13 @@ export class FilmRenderer {
     if (!gl.isContextLost()) {
       this.clearPool()
       for (const { program } of this.programs.values()) gl.deleteProgram(program)
-      for (const t of [this.sourceTexture, this.lutTexture, this.noiseTexture, this.stampTexture]) {
+      for (const t of [
+        this.sourceTexture,
+        this.lutTexture,
+        this.noiseTexture,
+        this.stampTexture,
+        this.frameTex,
+      ]) {
         if (t) gl.deleteTexture(t)
       }
       if (this.vao) gl.deleteVertexArray(this.vao)
@@ -584,7 +666,16 @@ export class FilmRenderer {
     this.noiseTexture = null
     this.stampTexture = null
     this.stampKey = ''
+    this.frameTex = null
+    this.frameKey = ''
   }
+}
+
+/** A `#rrggbb` color in linear light, for the film base around a weaving frame. */
+function cssColorToLinear(color: string): number[] {
+  const match = /^#([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})$/i.exec(color)
+  if (!match) return [0, 0, 0]
+  return match.slice(1).map((hex) => srgbToLinear(parseInt(hex, 16) / 255))
 }
 
 /** This shot's exposure and white balance change, as a linear gain per channel. */
